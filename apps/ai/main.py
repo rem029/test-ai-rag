@@ -1,3 +1,4 @@
+from itertools import tee
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -36,12 +37,7 @@ async def handle_message(request: MessageRequest):
         return {"description": description}
 
     if request.text:
-        # Embedding and response generation logic
-        # Fetch embeddings from the database
-        db_embeddings = await get_embeddings_from_db(request.text)
-
-        # Pass the embeddings to stream_response
-        response_stream = stream_response(request.text, db_embeddings, request.stream)
+        response_stream = stream_response(request.text, request.stream)
         return StreamingResponse(response_stream, media_type="text/plain")
 
     if request.audioResponse:
@@ -77,14 +73,19 @@ async def analyze_image(image_data: str) -> str:
     return "Image description"
 
 
-async def stream_response(text: str, embedding: dict, stream: bool = True):
+async def stream_response(text: str, stream: bool = True):
     """
     Stream response from Ollama API using the gemma3:1b-it-q4_K_M model.
     The text is sent as input, and the embedding is sent as context.
     Defaults context to null if no embedding is found.
     """
+    # Embedding and response generation logic
+    # Fetch embeddings from the database
+    embedding = await embed_text(text)
+    db_embeddings = await get_embeddings_from_db(embedding)
+
     # Convert embedding to a string representation for context
-    embedding_context = "\n".join([f"- {item['message']}" for item in embedding])
+    embedding_context = "\n".join([f"- {item['message']}" for item in db_embeddings])
 
     # system_prompt = (
     #     "If asked about me, respond using the context below. "
@@ -107,15 +108,26 @@ async def stream_response(text: str, embedding: dict, stream: bool = True):
         "Strictly respond using information from the list above."
     )
 
-    print("System prompt:\n===\n", system_prompt, "\n===")
-
     messages = [
         {"role": "system", "content": system_prompt},
-        {"role": "user", "content": text},
     ]
 
-    print("Response:\n", end="")
+    print("System messages:\n===\n", system_prompt, "\n===")
+
+    recent_messages = await get_recent_messages(limit=5)  # Fetch the last 5 messages
+    recent_messages.reverse()  # Reverse the list to maintain chronological order
+    print("Last messages:\n===")
+    for msg in recent_messages:
+        print(msg["role"], ":", msg["message"])
+        messages.append({"role": msg["role"], "content": msg["message"]})
+    print("===")
+
+    messages.append({"role": "user", "content": text})
+    await save_message(text, "user", embedding)
+
+    print("Response:\n")
     if stream:
+        text = ""
         async for part in await client.chat(
             model="gemma3:1b-it-q4_K_M",
             # model="moondream:1.8b-v2-q4_K_M",
@@ -123,17 +135,26 @@ async def stream_response(text: str, embedding: dict, stream: bool = True):
             stream=True,
         ):
             content = part["message"]["content"]
+            if part.done:
+                embedding = await embed_text(text)
+                await save_message(text, "assistant", embedding)
             for char in content:  # Yield character by character
+                text += char
                 print(char, end="", flush=True)
+                # Save the message content directly
                 yield char
     else:
         response = await client.chat(
             model="gemma3:1b-it-q4_K_M", messages=messages, stream=False
         )
         content = response["message"]["content"]
+        embedding = await embed_text(content)
+        await save_message(content, "assistant", embedding)
         for char in content:  # Yield character by character
             print(char, end="", flush=True)
             yield char
+
+    # # Save the entire content and embedding after processing
 
 
 # PostgreSQL connection details
@@ -176,8 +197,9 @@ def initialize_database():
             CREATE EXTENSION IF NOT EXISTS vector;
             CREATE TABLE IF NOT EXISTS messages (
                 id SERIAL PRIMARY KEY,
-                user_message TEXT NOT NULL,
-                system_response TEXT NOT NULL,
+                sessionId TEXT DEFAULT 'default_session',
+                message TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'system',
                 embedding vector(768),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
@@ -197,15 +219,15 @@ initialize_database()
 
 
 # Fetch embeddings and similarity scores from the database
-async def get_embeddings_from_db(user_message: str):
+async def get_embeddings_from_db(embedding: dict):
     """
     Fetch embeddings and similarity scores from the database based on the user message.
     """
-    embedding = await embed_text(user_message)
     cursor.execute(
         """
-        SELECT user_message, embedding <=> %s::vector AS similarity
+        SELECT message, embedding <=> %s::vector AS similarity
         FROM messages
+        WHERE role ='system'
         ORDER BY similarity ASC
         LIMIT 3
         """,
@@ -227,10 +249,10 @@ async def insert_embedding(texts: list[str]):
             embedding = await embed_text(text)
             cursor.execute(
                 """
-                INSERT INTO messages (user_message, system_response, embedding)
+                INSERT INTO messages (message, role, embedding)
                 VALUES (%s, %s, %s)
                 """,
-                (text, "", embedding["embedding"]),
+                (text, "system", embedding["embedding"]),
             )
         conn.commit()
         return {"status": "success", "message": "Embeddings inserted successfully."}
@@ -241,3 +263,46 @@ async def insert_embedding(texts: list[str]):
             "status": "error",
             "message": "Failed to insert embeddings into the database.",
         }
+
+
+async def save_message(message: str, role: str, embedding: dict):
+    """
+    Save a message and its embedding to the database.
+    """
+    try:
+        cursor.execute(
+            """
+            INSERT INTO messages (message, role, embedding)
+            VALUES (%s, %s, %s)
+            """,
+            (message, role, embedding["embedding"]),
+        )
+        conn.commit()
+    except psycopg2.Error as e:
+        print("Database error:", e)
+        conn.rollback()  # Rollback the transaction
+
+
+async def get_recent_messages(limit: int):
+    """
+    Fetch the most recent messages and their roles from the database.
+    Filters messages from users and assistant, sorted by latest date.
+    """
+    try:
+        cursor.execute(
+            """
+            SELECT message, role, created_at
+            FROM messages
+            WHERE role IN ('user', 'assistant')
+            ORDER BY created_at DESC
+            LIMIT %s
+            """,
+            (limit,),
+        )
+        results = cursor.fetchall()
+        return [
+            {"message": row[0], "role": row[1], "created_at": row[2]} for row in results
+        ]
+    except psycopg2.Error as e:
+        print("Database error while fetching recent messages:", e)
+        return []

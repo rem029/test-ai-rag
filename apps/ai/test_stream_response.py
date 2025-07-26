@@ -16,7 +16,7 @@ def chat_with_server():
             with client.stream(
                 "POST", "http://localhost:8000/message", json=payload, headers=headers
             ) as response:
-                print("Manong:", end="\t")
+                print("Mary Test:", end="\t")
                 if response.status_code == 200:
                     # Stream the server's response character by character
                     for char in response.iter_text():
