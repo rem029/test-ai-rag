@@ -1,0 +1,29 @@
+# Node.js dependencies
+node_modules/
+
+# Python virtual environment
+apps/ai/.venv/
+
+# Environment variables
+.env
+
+# Logs
+*.log
+
+# Compiled Python files
+*.pyc
+__pycache__/
+
+# Database files
+*.sqlite
+*.db
+
+# HTTP request files
+rest/*.http
+
+# VS Code settings
+.vscode/
+
+# System files
+.DS_Store
+Thumbs.db
