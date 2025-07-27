@@ -8,8 +8,11 @@ def chat_with_server():
         # Get user input
         user_input = input("\nYou:\t")
 
+        context = "You are my teacher and I am your student. "
+        context += "Answer my questions based on the context provided."
+
         # Send the input to the /message endpoint
-        payload = {"text": user_input, "stream": True}
+        payload = {"text": user_input, "stream": True, "context": context}
         headers = {"Content-Type": "application/json"}
 
         with httpx.Client() as client:

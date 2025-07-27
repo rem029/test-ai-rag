@@ -24,6 +24,7 @@ class MessageRequest(BaseModel):
     audioResponse: Optional[bool] = False
     stream: Optional[bool] = False
     messages: Optional[list] = []  # Store conversation history
+    context: Optional[str] = None  # Optional context to replace system_prompt
 
 
 @app.post("/message")
@@ -37,7 +38,7 @@ async def handle_message(request: MessageRequest):
         return {"description": description}
 
     if request.text:
-        response_stream = stream_response(request.text, request.stream)
+        response_stream = stream_response(request.text, request.stream, request.context)
         return StreamingResponse(response_stream, media_type="text/plain")
 
     if request.audioResponse:
@@ -73,40 +74,39 @@ async def analyze_image(image_data: str) -> str:
     return "Image description"
 
 
-async def stream_response(text: str, stream: bool = True):
+async def stream_response(
+    text: str, stream: bool = True, context: Optional[str] = None
+):
     """
     Stream response from Ollama API using the gemma3:1b-it-q4_K_M model.
     The text is sent as input, and the embedding is sent as context.
     Defaults context to null if no embedding is found.
     """
     # Embedding and response generation logic
-    # Fetch embeddings from the database
     embedding = await embed_text(text)
     db_embeddings = await get_embeddings_from_db(embedding)
 
     # Convert embedding to a string representation for context
     embedding_context = "\n".join([f"- {item['message']}" for item in db_embeddings])
 
-    # system_prompt = (
-    #     "If asked about me, respond using the context below. "
-    #     "Use context below to answer the question but do not mention it in your responses.\n\n"
-    #     f"Context:\n{embedding_context}\n"
-    # )
-
-    system_prompt = (
-        "You are Mary Test's official support agent.\n\n"
-        "Behavior Rules:\n"
-        "- If greeted politely (e.g., 'hello', 'hi', 'good morning'), respond with:\n"
-        '  "Hello, I am Mary Test\'s official support agent. How can I assist you today?"\n'
-        "- If the question is NOT related to Mary Test, respond with:\n"
-        '  "I\'m sorry, I can only answer questions about Mary Test."\n\n'
-        "Topic Restriction:\n"
-        "You are only allowed to answer questions directly related to the company Mary Test. "
-        "Do not respond to general tech queries, personal questions, or anything outside the company's scope.\n\n"
-        "You may only use the facts below to answer questions. Do not fabricate or assume details.\n\n"
-        f"{embedding_context}\n"
-        "Strictly respond using information from the list above."
-    )
+    if context:
+        system_prompt = f"{context}\n"
+        system_prompt += f"\nContext:\n{embedding_context}"
+    else:
+        system_prompt = (
+            "You are Mary Test's official support agent.\n\n"
+            "Behavior Rules:\n"
+            "- If greeted politely (e.g., 'hello', 'hi', 'good morning'), respond with:\n"
+            '  "Hello, I am Mary Test\'s official support agent. How can I assist you today?"\n'
+            "- If the question is NOT related to Mary Test, respond with:\n"
+            '  "I\'m sorry, I can only answer questions about Mary Test."\n\n'
+            "Topic Restriction:\n"
+            "You are only allowed to answer questions directly related to the company Mary Test. "
+            "Do not respond to general tech queries, personal questions, or anything outside the company's scope.\n\n"
+            "You may only use the facts below to answer questions. Do not fabricate or assume details.\n\n"
+            f"{embedding_context}\n"
+            "Strictly respond using information from the list above."
+        )
 
     messages = [
         {"role": "system", "content": system_prompt},
@@ -235,7 +235,6 @@ async def get_embeddings_from_db(embedding: dict):
     )
     results = cursor.fetchall()
     resultsFinal = [{"message": row[0], "similarity": row[1]} for row in results]
-    print("Results from DB:", resultsFinal)
     return resultsFinal
 
 
@@ -247,13 +246,7 @@ async def insert_embedding(texts: list[str]):
     try:
         for text in texts:
             embedding = await embed_text(text)
-            cursor.execute(
-                """
-                INSERT INTO messages (message, role, embedding)
-                VALUES (%s, %s, %s)
-                """,
-                (text, "system", embedding["embedding"]),
-            )
+            await save_message(text, "system", embedding)
         conn.commit()
         return {"status": "success", "message": "Embeddings inserted successfully."}
     except psycopg2.Error as e:
