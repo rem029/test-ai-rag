@@ -27,3 +27,9 @@ rest/*.http
 # System files
 .DS_Store
 Thumbs.db
+
+pgvector-data/
+ollama/
+open-webui/
+
+.venv/

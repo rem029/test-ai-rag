@@ -1,11 +1,19 @@
 # To run apps/ai
 
 1. `cd /apps/ai`
-2. `uvicorn main:app --port 8000 --reload`
+2. `python3 -m venv .venv`
+3. `pip install fastapi uvicorn ollama python-dotenv psycopg2-binary`
+4. `uvicorn main:app --port 8000 --reload`
 
 # Local environment:
 
 ### Podman for Ollama, Open Web UI and Postgres
+
+at project root
+```
+docker compose up -d
+```
+OR
 
 ```
 # Create a shared pod

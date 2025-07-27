@@ -130,7 +130,7 @@ async def stream_response(
         text = ""
         async for part in await client.chat(
             model="gemma3:1b-it-q4_K_M",
-            # model="moondream:1.8b-v2-q4_K_M",
+            # model="moondream:1.8b-v2-q4_K_M",            
             messages=messages,
             stream=True,
         ):
@@ -160,7 +160,7 @@ async def stream_response(
 # PostgreSQL connection details
 DB_CONFIG = {
     "host": "localhost",
-    "port": 5433,
+    "port": 5454,
     "user": "postgres",
     "password": "123",
     "database": "test_db",

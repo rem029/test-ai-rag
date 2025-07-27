@@ -15,7 +15,7 @@ def chat_with_server():
         payload = {"text": user_input, "stream": True, "context": context}
         headers = {"Content-Type": "application/json"}
 
-        with httpx.Client() as client:
+        with httpx.Client(timeout=60.0) as client:
             with client.stream(
                 "POST", "http://localhost:8000/message", json=payload, headers=headers
             ) as response:
