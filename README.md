@@ -2,17 +2,28 @@
 
 1. `cd /apps/ai`
 2. `python3 -m venv .venv`
-3. `pip install fastapi uvicorn ollama python-dotenv psycopg2-binary`
-4. `uvicorn main:app --port 8000 --reload`
+3. `source .venv/bin/activate`
+4. `pip install fastapi uvicorn ollama python-dotenv psycopg2-binary httpx`
+5. `uvicorn main:app --port 8000 --reload`
 
 # Local environment:
 
 ### Podman for Ollama, Open Web UI and Postgres
 
-at project root
+### at project root
+
+#### Docker
+
 ```
 docker compose up -d
 ```
+
+#### Podman
+
+```
+podman compose up -d
+```
+
 OR
 
 ```
