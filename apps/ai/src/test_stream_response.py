@@ -6,7 +6,8 @@ def chat_with_server():
 
     while True:
         # Get user input
-        user_input = input("\nYou:\t")
+        user_input = input("\nYou:\n---\n")
+        print("---\n")
 
         context = "You are my teacher and I am your student. "
         context += "Answer my questions based on the context provided."
@@ -19,7 +20,7 @@ def chat_with_server():
             with client.stream(
                 "POST", "http://localhost:8000/message", json=payload, headers=headers
             ) as response:
-                print("Mary Test:", end="\t")
+                print("Mary Test:", end="\n---\n")
                 if response.status_code == 200:
                     # Stream the server's response character by character
                     for char in response.iter_text():
