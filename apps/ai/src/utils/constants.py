@@ -13,3 +13,10 @@ DB_CONFIG = {
 }
 
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+
+MODELS = {
+    # "text": 'gemma3:1b-it-q4_K_M',
+    "text": "moondream:1.8b-v2-q4_K_M",
+    "embed": 'nomic-embed-text',
+    "vision": "moondream:1.8b-v2-q4_K_M"
+}

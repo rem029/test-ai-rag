@@ -1,18 +1,16 @@
 from ollama import AsyncClient
-from utils.constants import OLLAMA_HOST
+from utils.constants import MODELS, OLLAMA_HOST
 
 client = AsyncClient(host='http://localhost:11434')
-
 
 async def embed_text(text: str) -> dict:
     """
     Generate embedding for the given text using nomic-embed-text with Ollama.
     """
-    # Use Ollama's embedding API to generate embeddings
-    print("Ollama Host:", OLLAMA_HOST)
+    # Use Ollama's embedding API to generate embeddings    
     try:
         
-        response = await client.embeddings(model="nomic-embed-text", prompt=text)
+        response = await client.embeddings(model=MODELS['embed'], prompt=text)
         return {"embedding": response["embedding"]}
     except Exception as e:
         print(f"Error generating embedding: {e}")
@@ -47,13 +45,13 @@ async def chat_with_model(messages: list, stream: bool = True):
     """
     if stream:
         return await client.chat(
-            model="gemma3:1b-it-q4_K_M",
+            model=MODELS['text'],
             messages=messages,
             stream=True,
         )
     else:
         return await client.chat(
-            model="gemma3:1b-it-q4_K_M", 
+            model=MODELS['text'], 
             messages=messages, 
             stream=False
         )

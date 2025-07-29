@@ -1,3 +1,4 @@
+from utils.constants import OLLAMA_HOST
 from fastapi import FastAPI
 from dotenv import load_dotenv
 from services.db import initialize_database
@@ -5,13 +6,39 @@ from routes.health import router as health_router
 from routes.message import router as message_router
 from routes.embed import router as embed_router
 
+import httpx
+
 # Load environment variables from .env file
 load_dotenv()
 
 # Initialize FastAPI app
 app = FastAPI()
 
-initialize_database()
+async def test_ollama_connection():
+    """Test Ollama connection using httpx"""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{OLLAMA_HOST}/api/tags")
+            if response.status_code == 200:
+                data = response.json()
+                models = [model["name"] for model in data.get("models", [])]
+                print(f"✅ Ollama connected! Available models:\n\n {',\n '.join(models)}\n")
+                return True
+            else:
+                print(f"❌ Ollama API returned status {response.status_code}")
+                return False
+    except Exception as e:
+        print(f"❌ Ollama connection failed: {e}")
+        print(f"   Trying to connect to: {OLLAMA_HOST}/api/tags")
+        return False
+
+# Initialize database on startup
+@app.on_event("startup")
+async def startup_event():
+    print("🚀 Starting application...")
+    initialize_database()
+    await test_ollama_connection()
+    print("✅ Startup complete!")
 
 # Include routers
 app.include_router(health_router)
