@@ -96,8 +96,6 @@ async def stream_response_logic(session_id: str,text: str, stream: bool = True, 
     The text is sent as input, and the embedding is sent as context.
     Defaults context to null if no embedding is found.
     """
-    if audioResponse:
-        stream = False
     # Embedding and response generation logic
     embedding = await embed_text(text)
     db_embeddings = await get_embeddings_from_db(embedding)
@@ -170,11 +168,15 @@ async def stream_response_logic(session_id: str,text: str, stream: bool = True, 
             if part.done:
                 embedding = await embed_text(text_response)
                 await save_message(text_response, "assistant", embedding, session_id)
+                        # Generate audio file at the end of streaming if requested
             for char in content:  # Yield character by character
                 text_response += char
                 print(char, end="", flush=True)
                 # Save the message content directly
                 yield char
+        if audioResponse:
+            audio_file = await text_to_speech(text_response)
+            yield f"\n[AUDIO_FILE:{audio_file}]"
     else:
         response = await client.chat(
             model=model,
