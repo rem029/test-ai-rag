@@ -1,6 +1,6 @@
 from typing import Optional
 from ollama import AsyncClient
-from apps.ai.src.services.audio import text_to_speech_yapper
+from services.audio import text_to_speech_yapper
 from services.db import get_embeddings_from_db, get_recent_messages, save_message
 from utils.constants import MODELS
 
@@ -62,8 +62,10 @@ async def stream_response_logic(
     embedding_context = "\n".join([f"- {item['message']}" for item in db_embeddings])
 
     if context:
-        system_prompt = f"{context}\n"
-        system_prompt += "Keep answer short and straightforward. Base your answer on the context provided. if there is no context, use the default context.\n"
+
+        system_prompt = "Keep answer short and straightforward. Your response should be in plain text. Base your answer on the context provided. if there is no context, use the default context.\n"
+        system_prompt += f"{context}\n"
+        system_prompt += "You may use the facts below to answer questions. Do not fabricate or assume details.\n\n"
         system_prompt += f"\nContext:\n{embedding_context}"
     else:
         system_prompt = (
