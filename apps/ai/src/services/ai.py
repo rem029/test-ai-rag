@@ -99,6 +99,10 @@ async def stream_response_logic(text: str, stream: bool = True, context: Optiona
 
     await save_message(text, "user", embedding)
 
+    # insert here thinking action to be made decided by gemma3    
+    # if user asks for a summary, summarize the last 6 messages
+    # if user ask to remember you should embed the message and save it
+
     print(f"Model: {model}\n")
     print("Response:\n")
     if stream:
