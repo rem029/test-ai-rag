@@ -33,3 +33,6 @@ ollama/
 open-webui/
 
 .venv/
+
+uploads
+uploads/*
