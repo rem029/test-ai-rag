@@ -1,3 +1,7 @@
+# Installation recommendation.
+- pyenv
+- python 3.10+
+
 # To run apps/ai
 
 1. `cd /apps/ai`

@@ -127,6 +127,8 @@ async def stream_response_logic(
             stream=True,
         ):
             content = part["message"]["content"]
+            if "usage" in part:  # Check if token usage is included
+                print(f"Tokens used: {part['usage']['total_tokens']}")
             if part.done:
                 embedding = await embed_text(text_response)
                 await save_message(text_response, "assistant", embedding, session_id)

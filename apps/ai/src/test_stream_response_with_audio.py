@@ -151,12 +151,13 @@ def chat_with_server():
                             match = re.search(r"\[AUDIO_FILE:(.*?)\]", full_response)
                             if match:
                                 audio_file_path = match.group(1)
+                                print("\n")
                                 # Remove the audio marker from display
-                                display_text = re.sub(
-                                    r"\[AUDIO_FILE:.*?\]", "", full_response
-                                )
+                                # display_text = re.sub(
+                                #     r"\[AUDIO_FILE:.*?\]", "", full_response
+                                # )
                                 # Clear the line and print clean text
-                                print(f"\r{display_text}", end="", flush=True)
+                                # print(f"\r{display_text}", end="", flush=True)
                                 break
                         else:
                             print(char, end="", flush=True)

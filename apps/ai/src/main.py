@@ -24,11 +24,15 @@ async def test_ollama_connection():
                 data = response.json()
                 models = [model["name"] for model in data.get("models", [])]
                 print(
-                    f"✅ Ollama connected! Available models:\n\n {',\n '.join(models)}\n"
+                    "✅ Ollama connected! Available models:\n"
                 )
+                for model in models:
+                    print(f"{model}")   
+                print("\n")             
                 return True
             else:
-                print(f"❌ Ollama API returned status {response.status_code}")
+                print("❌ Ollama API returned status")
+                print(f"{response.status_code}")
                 return False
     except Exception as e:
         print(f"❌ Ollama connection failed: {e}")
