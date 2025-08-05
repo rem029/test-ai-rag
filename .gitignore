@@ -36,3 +36,6 @@ open-webui/
 
 uploads
 uploads/*
+
+tmp
+tmp/*

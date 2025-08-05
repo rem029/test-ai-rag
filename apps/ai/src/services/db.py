@@ -1,3 +1,4 @@
+from typing import Optional
 import psycopg2
 from utils.constants import DB_CONFIG
 
@@ -92,19 +93,21 @@ async def get_embeddings_from_db(embedding: dict):
     return resultsFinal
 
 
-async def save_message(message: str, role: str, embedding: dict):
+async def save_message(message: str, role: str, embedding: dict, session_id: Optional[str] = None):
     """
     Save a message and its embedding to the database.
     """
     connection = get_db_connection_instance()
     cursor = connection.cursor()
+    effective_session_id = session_id if session_id is not None else 'default_session'
+    print("Saving message to database for session:", effective_session_id)
     try:
         cursor.execute(
             """
-            INSERT INTO messages (message, role, embedding)
-            VALUES (%s, %s, %s)
+            INSERT INTO messages (message, role, embedding, sessionId)
+            VALUES (%s, %s, %s, %s)
             """,
-            (message, role, embedding["embedding"]),
+            (message, role, embedding["embedding"], effective_session_id),
         )
         connection.commit()
     except psycopg2.Error as e:
@@ -114,22 +117,25 @@ async def save_message(message: str, role: str, embedding: dict):
         cursor.close()
 
 
-async def get_recent_messages(limit: int):
+async def get_recent_messages(limit: int, session_id: Optional[str] = None):
     """
     Fetch the most recent messages and their roles from the database.
     Filters messages from users and assistant, sorted by latest date.
     """
     cursor = get_db_connection()
+    effective_session_id = session_id if session_id is not None else 'default_session'
+    print("Fetching recent messages for session:", effective_session_id)
     try:
         cursor.execute(
             """
             SELECT message, role, created_at
             FROM messages
             WHERE role IN ('user', 'assistant')
+            AND sessionId = %s
             ORDER BY created_at DESC
             LIMIT %s
             """,
-            (limit,),
+            (effective_session_id, limit),
         )
         results = cursor.fetchall()
         return [

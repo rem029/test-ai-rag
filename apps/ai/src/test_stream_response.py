@@ -1,6 +1,7 @@
 import base64
 import os
 import httpx
+import uuid
 
 def img_to_base64(image_path: str) -> str:
     """
@@ -19,19 +20,37 @@ def img_to_base64(image_path: str) -> str:
 
 
 def chat_with_server():
-    print("Connected to the chat server. Type your message:")
+    session_id = str(uuid.uuid4())
+    print(f"Connected to the chat server. Session ID: {session_id}")
+    print("Type your message:")
+
+    context_default = "You are my teacher and I am your student. "
+    context_default += "Answer my questions based on the context provided."
+
+    context_input = input(f"\nOverrride Context?:\n---\nDefault: {context_default}\nType your context or press Enter to use default:\n---\n")
 
     while True:
+        print("\n")
+        context = context_input
+
         # Get user input
-        user_input = input("\nYou:\n---\n")
-        image_path = input("\nImage Path:\n---\n")
+        user_input = input("You:\n---\n")
+
+        
+        if not context.strip():
+            context = context_default
+
+        if not user_input.strip():
+            print("Exiting chat.")
+            break
+        
+        image_path = input("Image Path:\n---\nType the image path or press Enter to skip:\n---\n")
         print("---\n")
 
-        context = "You are my teacher and I am your student. "
-        context += "Answer my questions based on the context provided."
-        image_path = image_path.strip()
+        image_path = image_path.strip()       
+
         # Send the input to the /message endpoint
-        payload = {"text": user_input, "stream": True, "context": context}
+        payload = {"text": user_input, "stream": True, "context": context, "session_id": session_id}
         if image_path:
             if os.path.exists(image_path):
                 base64_image = img_to_base64(image_path)
