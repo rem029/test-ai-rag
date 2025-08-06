@@ -67,6 +67,8 @@ services:
       [
         "-m",
         "/models/spacethinker-qwen2.5VL-3B-q4_k_m.gguf",
+        "--mmproj",
+        "/models/spacethinker-qwen2.5vl-3b-vision.gguf",
         "--port",
         "8000",
         "--host",
@@ -120,7 +122,7 @@ services:
     container_name: llama-gemma34b
     restart: unless-stopped
     ports:
-      - "9004:8000"
+      - "9001:8000"
     devices:
       - "/dev/dri:/dev/dri"
     volumes:
