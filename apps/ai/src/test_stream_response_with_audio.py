@@ -12,11 +12,23 @@ def img_to_base64(image_path: str) -> str:
     Convert an image file to a base64 encoded string.
     """
     try:
-        with open(image_path, "rb") as image_file:
+        # If it's just a filename, prepend the uploads directory path
+        if not os.path.dirname(image_path):  # No directory in the path
+            current_dir = os.getcwd()
+            if current_dir.endswith("src"):
+                # If we're in the src directory, go up one level to uploads
+                full_image_path = os.path.join(current_dir, "", "uploads", image_path)
+            else:   
+                full_image_path = os.path.join(current_dir, "src", "uploads", image_path)
+            print(f"Using image path: {full_image_path}")
+        else:
+            full_image_path = image_path  # Use full path if provided
+            
+        with open(full_image_path, "rb") as image_file:
             encoded_string = base64.b64encode(image_file.read()).decode("utf-8")
             return encoded_string
     except FileNotFoundError:
-        print(f"Image file not found: {image_path}")
+        print(f"Image file not found: {full_image_path}")
         return ""
     except Exception as e:
         print(f"Error reading image file: {e}")
@@ -98,10 +110,6 @@ def chat_with_server():
         if not context.strip():
             context = context_default
 
-        if not user_input.strip():
-            print("Exiting chat.")
-            break
-
         image_path = input(
             "Image Path:\n---\nType the image path or press Enter to skip:\n---\n"
         )
@@ -123,12 +131,10 @@ def chat_with_server():
         }
 
         if image_path:
-            if os.path.exists(image_path):
-                base64_image = img_to_base64(image_path)
-                if base64_image:
-                    payload["image"] = base64_image
-            else:
-                print(f"Image file does not exist: {image_path}")
+            base64_image = img_to_base64(image_path)
+        
+        if base64_image:
+                payload["image"] = base64_image
 
         headers = {"Content-Type": "application/json"}
 

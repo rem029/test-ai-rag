@@ -62,7 +62,6 @@ async def stream_response_logic(
     embedding_context = "\n".join([f"- {item['message']}" for item in db_embeddings])
 
     if context:
-
         system_prompt = "Keep answer short and straightforward. Your response should be in plain text. Base your answer on the context provided. if there is no context, use the default context.\n"
         system_prompt += f"{context}\n"
         system_prompt += "You may use the facts below to answer questions. Do not fabricate or assume details.\n\n"
@@ -83,21 +82,28 @@ async def stream_response_logic(
             "Strictly respond using information from the list above."
         )
 
+
+
+    if image:
+        print("Image provided for analysis.")
+        system_prompt = "Keep answer short and straightforward. You should response with plain text. "
+        system_prompt += "Be specific, calculate distance between you and the object you see."
+        system_prompt += "Base your answer on the image provided."
+    else:
+        recent_messages = await get_recent_messages(
+            limit=5, session_id=session_id
+        )  # Fetch the last 5 messages
+        recent_messages.reverse()  # Reverse the list to maintain chronological order
+        print("Last messages:\n===")
+        for msg in recent_messages:
+            print(msg["role"], ":", msg["message"])
+            messages.append({"role": msg["role"], "content": msg["message"]})
+        print("===")
+
     messages = [
         {"role": "system", "content": system_prompt},
     ]
-
     print("System messages:\n===\n", system_prompt, "\n===")
-
-    recent_messages = await get_recent_messages(
-        limit=5, session_id=session_id
-    )  # Fetch the last 5 messages
-    recent_messages.reverse()  # Reverse the list to maintain chronological order
-    print("Last messages:\n===")
-    for msg in recent_messages:
-        print(msg["role"], ":", msg["message"])
-        messages.append({"role": msg["role"], "content": msg["message"]})
-    print("===")
 
     model = MODELS["text"]
     if image:

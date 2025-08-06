@@ -102,6 +102,9 @@ async def save_message(message: str, role: str, embedding: dict, session_id: Opt
     effective_session_id = session_id if session_id is not None else 'default_session'
     print("Saving message to database for session:", effective_session_id)
     try:
+        if not message or embedding is None:
+            print("Message or embedding is None, skipping save.")
+            return
         cursor.execute(
             """
             INSERT INTO messages (message, role, embedding, sessionId)
