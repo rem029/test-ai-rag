@@ -39,3 +39,6 @@ uploads/*
 
 tmp
 tmp/*
+
+/models
+/models/*

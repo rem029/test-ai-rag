@@ -1,6 +1,22 @@
 # Installation recommendation.
+
 - pyenv
 - python 3.10+
+
+# Install models at root folder.
+
+- create models folder at root
+  ```
+  /
+  /apps
+  */models*
+  /...
+  ```
+- Installing model sample:
+
+- `wget -P ./models https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF/blob/main/nomic-embed-text-v1.5.Q4_K_M.gguf`
+- `wget -P ./models https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/blob/main/qwen2.5-3b-instruct-q4_k_m.gguf`
+- `wget -P ./models https://huggingface.co/moondream/moondream2-gguf/blob/main/moondream2-text-model-f16.gguf`
 
 # To run apps/ai
 

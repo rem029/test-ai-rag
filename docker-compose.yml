@@ -1,4 +1,4 @@
-version: '3.9'
+version: "3.9"
 
 services:
   pgvector:
@@ -38,6 +38,104 @@ services:
       - open-webui:/app/backend/data
     depends_on:
       - ollama
+
+  llama-full:
+    image: ghcr.io/ggml-org/llama.cpp:full-vulkan
+    container_name: llama-full
+    stdin_open: true
+    tty: true
+    devices:
+      - "/dev/dri:/dev/dri"
+    volumes:
+      - ./models:/models
+    command:
+      ["--all-in-one", "/models", "7B"]
+      # This will attempt to download and prepare LLaMA 7B
+      # on the first container run. Requires Meta license acceptance.
+
+  llama-qwen2-5vl-3b:
+    image: ghcr.io/ggml-org/llama.cpp:server-vulkan
+    container_name: llama-qwen2-5vl-3b
+    restart: unless-stopped
+    ports:
+      - "9001:8000"
+    devices:
+      - "/dev/dri:/dev/dri"
+    volumes:
+      - ./models:/models
+    command:
+      [
+        "-m",
+        "/models/spacethinker-qwen2.5VL-3B-q4_k_m.gguf",
+        "--port",
+        "8000",
+        "--host",
+        "0.0.0.0",
+      ]
+
+  llama-nomic-embedv1-5:
+    image: ghcr.io/ggml-org/llama.cpp:server-vulkan
+    container_name: llama-nomic-embedv1-5
+    restart: unless-stopped
+    ports:
+      - "9002:8000"
+    devices:
+      - "/dev/dri:/dev/dri"
+    volumes:
+      - ./models:/models
+    command:
+      [
+        "-m",
+        "/models/nomic-embed-text-v1.5.Q4_K_M.gguf",
+        "--port",
+        "8000",
+        "--host",
+        "0.0.0.0",
+      ]
+
+  llama-moondream2:
+    image: ghcr.io/ggml-org/llama.cpp:server-vulkan
+    container_name: llama-moondream2
+    restart: unless-stopped
+    ports:
+      - "9003:8000"
+    devices:
+      - "/dev/dri:/dev/dri"
+    volumes:
+      - ./models:/models
+    command:
+      [
+        "-m",
+        "/models/moondream2-text-model-f16.gguf",
+        "--mmproj",
+        "/models/moondream2-mmproj-f16.gguf",
+        "--port",
+        "8000",
+        "--host",
+        "0.0.0.0",
+      ]
+
+  llama-gemma3-4b:
+    image: ghcr.io/ggml-org/llama.cpp:server-vulkan
+    container_name: llama-gemma34b
+    restart: unless-stopped
+    ports:
+      - "9004:8000"
+    devices:
+      - "/dev/dri:/dev/dri"
+    volumes:
+      - ./models:/models
+    command:
+      [
+        "-m",
+        "/models/gemma-3-4b-it-Q4_K_M.gguf",
+        "--mmproj",
+        "/models/gemma-3-4b-it-Q4_K_M-mmproj.gguf",
+        "--port",
+        "8000",
+        "--host",
+        "0.0.0.0",
+      ]
 
 volumes:
   pgvector-data:
