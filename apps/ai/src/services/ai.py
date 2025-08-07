@@ -1,32 +1,11 @@
 from typing import Optional
 from ollama import AsyncClient
+from services.embed import embed_text
 from services.audio import text_to_speech_yapper
 from services.db import get_embeddings_from_db, get_recent_messages, save_message
-from utils.constants import MODELS
+from utils.constants import MODEL_PORT
 
 client = AsyncClient(host="http://localhost:11434")
-
-
-async def embed_text(text: str) -> dict:
-    """
-    Generate embedding for the given text using nomic-embed-text with Ollama.
-    """
-    # Use Ollama's embedding API to generate embeddings
-    try:
-
-        response = await client.embeddings(model=MODELS["embed"], prompt=text)
-        return {"embedding": response["embedding"]}
-    except Exception as e:
-        print(f"Error generating embedding: {e}")
-        # Try alternative model names
-        try:
-            response = await client.embeddings(
-                model="nomic-embed-text:latest", prompt=text
-            )
-            return {"embedding": response["embedding"]}
-        except Exception as e2:
-            print(f"Error with latest tag: {e2}")
-            raise e2
 
 
 async def analyze_image(image_data: str) -> str:
@@ -82,12 +61,12 @@ async def stream_response_logic(
             "Strictly respond using information from the list above."
         )
 
-
-
     if image:
         print("Image provided for analysis.")
         system_prompt = "Keep answer short and straightforward. You should response with plain text. "
-        system_prompt += "Be specific, calculate distance between you and the object you see."
+        system_prompt += (
+            "Be specific, calculate distance between you and the object you see."
+        )
         system_prompt += "Base your answer on the image provided."
     else:
         recent_messages = await get_recent_messages(
