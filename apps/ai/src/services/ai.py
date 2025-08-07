@@ -58,21 +58,22 @@ async def stream_response_logic(
             "Strictly respond using information from the list above."
         )
 
+    messages = [
+        {"role": "system", "content": system_prompt},
+    ]
+
     recent_messages = await get_recent_messages(
-        limit=5, session_id=session_id
-    )  # Fetch the last 5 messages
+        limit=10, session_id=session_id
+    )  # Fetch the last 10 messages
     recent_messages.reverse()  # Reverse the list to maintain chronological order
 
+    print("System messages:\n===\n", system_prompt, "\n===")
     print("Last messages:\n===")
+
     for msg in recent_messages:
         print(msg["role"], ":", msg["message"])
         messages.append({"role": msg["role"], "content": msg["message"]})
         print("===")
-
-    messages = [
-        {"role": "system", "content": system_prompt},
-    ]
-    print("System messages:\n===\n", system_prompt, "\n===")
 
     if image_base64:
         messages.append(
@@ -112,17 +113,17 @@ async def stream_response_logic(
         )
         async for part in stream_resp:
             content = part.choices[0].delta.content or ""
+            finish_reason = part.choices[0].finish_reason or None
 
-            if getattr(part, "done", False):
+            if finish_reason == "stop":
                 if hasattr(part, "usage"):
-                    print(f"Tokens used: {part.usage}")
-
-                embedding = await embed_text(text_response)
-                await save_message(text_response, "assistant", embedding, session_id)
+                    print(f"\nTokens used: {getattr(part.usage, 'total_tokens', 0)}")
             for char in content:
                 text_response += char
                 print(char, end="", flush=True)
                 yield char
+        embedding = await embed_text(text_response)
+        await save_message(text_response, "assistant", embedding, session_id)
         if audioResponse:
             audio_file = await text_to_speech_yapper(text_response)
             yield f"\n[AUDIO_FILE:{audio_file}]"

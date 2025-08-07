@@ -12,8 +12,6 @@ async def embed_text(text: str) -> dict:
             input=text, encoding_format="float", model=""
         )
         vector = response[0].embedding[0]
-
-        print("embed_text.returning", vector)
         return {"embedding": vector}
     except Exception as e:
         print(f"Error generating embedding: {e}")
