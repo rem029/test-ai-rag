@@ -1,6 +1,6 @@
 # download qwen2.5VL
-wget https://huggingface.co/remyxai/SpaceThinker-Qwen2.5VL-3B/resolve/main/gguf/spacethinker-qwen2.5vl-3b-vision.gguf?download=true -O spacethinker-qwen2.5vl-3b-vision.gguf
-wget https://huggingface.co/remyxai/SpaceThinker-Qwen2.5VL-3B/resolve/main/gguf/spacethinker-qwen2.5VL-3B-q4_k_m.gguf?download=true -O spacethinker-qwen2.5VL-3B-q4_k_m.gguf
+wget https://huggingface.co/unsloth/Qwen2.5-VL-3B-Instruct-GGUF/resolve/main/Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf?download=true -O qwen2.5VL-3B-Instruct-Q4_K_M.gguf
+wget https://huggingface.co/unsloth/Qwen2.5-VL-3B-Instruct-GGUF/resolve/main/mmproj-F16.gguf?download=true -O mmproj-F16.gguf
 
 # download gemma3-4b
 wget https://huggingface.co/lmstudio-community/gemma-3-4b-it-GGUF/resolve/main/gemma-3-4b-it-Q4_K_M.gguf?download=true -O gemma-3-4b-it-Q4_K_M.gguf
