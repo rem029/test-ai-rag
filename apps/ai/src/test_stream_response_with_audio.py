@@ -18,12 +18,14 @@ def img_to_base64(image_path: str) -> str:
             if current_dir.endswith("src"):
                 # If we're in the src directory, go up one level to uploads
                 full_image_path = os.path.join(current_dir, "", "uploads", image_path)
-            else:   
-                full_image_path = os.path.join(current_dir, "src", "uploads", image_path)
+            else:
+                full_image_path = os.path.join(
+                    current_dir, "src", "uploads", image_path
+                )
             print(f"Using image path: {full_image_path}")
         else:
             full_image_path = image_path  # Use full path if provided
-            
+
         with open(full_image_path, "rb") as image_file:
             encoded_string = base64.b64encode(image_file.read()).decode("utf-8")
             return encoded_string
@@ -90,8 +92,8 @@ def chat_with_server():
     print(f"Connected to the chat server. Session ID: {session_id}")
     print("Type your message:")
 
-    context_default = "Be a wanderer. You analyze what you see.\n"
-    context_default += "Your response should where to move first. Forwards, backward right or left, next is what you see."
+    context_default = "Lets roleplay, you wander always wants to explore, I am your ride to tell me where to go, Describe what you see and the direction to go,\n"
+    context_default += 'respond in this format: "<description of what you see>. #<direction (left, right backward or forward)>. #<distance in meters>"'
 
     context_input = input(
         f"\nOverrride Context?:\n---\nDefault: {context_default}\nType your context or press Enter to use default:\n---\n"
@@ -132,8 +134,7 @@ def chat_with_server():
 
         if image_path:
             base64_image = img_to_base64(image_path)
-        
-        if base64_image:
+            if base64_image:
                 payload["image"] = base64_image
 
         headers = {"Content-Type": "application/json"}

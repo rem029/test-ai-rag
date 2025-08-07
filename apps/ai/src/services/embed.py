@@ -1,26 +1,20 @@
-from ollama import AsyncClient
+from urllib import response
 from utils.constants import MODEL_PORT
-
-client = AsyncClient(host="http://localhost:11434")
+from services.clients import model_embed
 
 
 async def embed_text(text: str) -> dict:
     """
     Generate embedding for the given text using nomic-embed-text with Ollama.
     """
-    # Use Ollama's embedding API to generate embeddings
     try:
+        response = await model_embed.embeddings.create(
+            input=text, encoding_format="float", model=""
+        )
+        vector = response[0].embedding[0]
 
-        response = await client.embeddings(model=MODEL_PORT, prompt=text)
-        return {"embedding": response["embedding"]}
+        print("embed_text.returning", vector)
+        return {"embedding": vector}
     except Exception as e:
         print(f"Error generating embedding: {e}")
-        # Try alternative model names
-        try:
-            response = await client.embeddings(
-                model="nomic-embed-text:latest", prompt=text
-            )
-            return {"embedding": response["embedding"]}
-        except Exception as e2:
-            print(f"Error with latest tag: {e2}")
-            raise e2
+        return {"embedding": [-1]}

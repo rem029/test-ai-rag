@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from dotenv import load_dotenv
-from utils.constants import OLLAMA_HOST
+from services.clients import check_model
 from services.db import initialize_database
 from routes.health import router as health_router
 from routes.message import router as message_router
@@ -15,29 +15,16 @@ load_dotenv()
 app = FastAPI()
 
 
-async def test_ollama_connection():
-    """Test Ollama connection using httpx"""
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(f"{OLLAMA_HOST}/api/tags")
-            if response.status_code == 200:
-                data = response.json()
-                models = [model["name"] for model in data.get("models", [])]
-                print(
-                    "✅ Ollama connected! Available models:\n"
-                )
-                for model in models:
-                    print(f"{model}")   
-                print("\n")             
-                return True
-            else:
-                print("❌ Ollama API returned status")
-                print(f"{response.status_code}")
-                return False
-    except Exception as e:
-        print(f"❌ Ollama connection failed: {e}")
-        print(f"   Trying to connect to: {OLLAMA_HOST}/api/tags")
-        return False
+async def test_model_server_connection():
+    """Test connection to OpenAI-compatible model server"""
+    print("🔗 Testing model server connection...")
+
+    for model_name in ["main", "embed"]:
+        ok = await check_model(model_name)
+        if ok:
+            print(f"✅ {model_name.capitalize()} model server connected!")
+        else:
+            print(f"❌ {model_name.capitalize()} model server connection failed!")
 
 
 # Initialize database on startup
@@ -45,7 +32,7 @@ async def test_ollama_connection():
 async def startup_event():
     print("🚀 Starting application...")
     initialize_database()
-    await test_ollama_connection()
+    await test_model_server_connection()
     print("✅ Startup complete!")
 
 

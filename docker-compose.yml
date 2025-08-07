@@ -61,7 +61,7 @@ services:
     container_name: llama-qwen2-5vl-3b
     restart: unless-stopped
     ports:
-      - "9001:8000"
+      - "${MODEL_MM_PORT}:8000"
     devices:
       - "/dev/dri:/dev/dri"
     volumes:
@@ -83,7 +83,7 @@ services:
     container_name: llama-nomic-embedv1-5
     restart: unless-stopped
     ports:
-      - "9002:8000"
+      - "${MODEL_EMBED_PORT}:8000"
     devices:
       - "/dev/dri:/dev/dri"
     volumes:
@@ -96,6 +96,7 @@ services:
         "8000",
         "--host",
         "0.0.0.0",
+        "--embeddings",
       ]
 
   llama-moondream2:
@@ -103,7 +104,7 @@ services:
     container_name: llama-moondream2
     restart: unless-stopped
     ports:
-      - "9003:8000"
+      - "${MODEL_MM_PORT}:8000"
     devices:
       - "/dev/dri:/dev/dri"
     volumes:
@@ -125,7 +126,7 @@ services:
     container_name: llama-gemma34b
     restart: unless-stopped
     ports:
-      - "9001:8000"
+      - "${MODEL_MM_PORT}:8000"
     devices:
       - "/dev/dri:/dev/dri"
     volumes:
