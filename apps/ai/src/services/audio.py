@@ -1,6 +1,7 @@
 import os
 import uuid
-
+import subprocess
+import platform
 from yapper import PiperSpeaker
 
 
@@ -81,3 +82,50 @@ async def text_to_speech(text: str) -> str:
     except Exception as e:
         print(f"Error generating TTS: {e}")
         raise e
+
+
+def play_audio(file_path: str):
+    """
+    Play audio file using system's default audio player.
+    """
+    try:
+        system = platform.system()
+        if system == "Linux":
+            players = [
+                ["mpv", "--no-video", file_path],
+                ["vlc", "--intf", "dummy", "--play-and-exit", file_path],
+                ["mpg123", file_path],
+                ["aplay", file_path],
+                ["paplay", file_path],
+            ]
+            for player_cmd in players:
+                try:
+                    subprocess.run(
+                        player_cmd,
+                        check=True,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    print(f"Playing audio with {player_cmd[0]}")
+                    break
+                except (subprocess.CalledProcessError, FileNotFoundError):
+                    continue
+            else:
+                print("No suitable audio player found")
+        elif system == "Darwin":
+            subprocess.run(["afplay", file_path], check=True)
+        elif system == "Windows":
+            subprocess.run(
+                [
+                    "powershell",
+                    "-c",
+                    f"(New-Object Media.SoundPlayer '{file_path}').PlaySync()",
+                ],
+                check=True,
+            )
+        else:
+            print(f"Unsupported system: {system}")
+    except subprocess.CalledProcessError as e:
+        print(f"Error playing audio: {e}")
+    except FileNotFoundError:
+        print("Audio player not found. Please install required audio tools.")

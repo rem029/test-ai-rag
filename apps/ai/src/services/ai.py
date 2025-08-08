@@ -1,6 +1,7 @@
+import os
 from typing import Optional
 from services.embed import embed_text
-from services.audio import text_to_speech_yapper
+from services.audio import play_audio, text_to_speech_yapper
 from services.db import get_embeddings_from_db, get_recent_messages, save_message
 from services.clients import model_main
 
@@ -38,10 +39,8 @@ async def stream_response_logic(
     embedding_context = "\n".join([f"- {item['message']}" for item in db_embeddings])
 
     if context:
-        system_prompt = "Keep answer short and straightforward. Base your answer on the context provided. if there is no context, use the default context.\n"
-        system_prompt += f"{context}\n"
-        system_prompt += "You may use the facts below to answer questions. Do not fabricate or assume details.\n\n"
-        system_prompt += f"\nContext:\n{embedding_context}"
+        system_prompt = f"{context}\n"
+        system_prompt += f"{embedding_context}"
     else:
         system_prompt = (
             "You are Mary Test's official support agent.\n\n"
@@ -126,7 +125,9 @@ async def stream_response_logic(
         await save_message(text_response, "assistant", embedding, session_id)
         if audioResponse:
             audio_file = await text_to_speech_yapper(text_response)
-            yield f"\n[AUDIO_FILE:{audio_file}]"
+            if audio_file and os.path.exists(audio_file):
+                play_audio(audio_file)
+                yield f"\n[AUDIO_FILE:{audio_file}]"
     else:
         response = await model_main.chat.completions.create(
             model="",
@@ -142,7 +143,9 @@ async def stream_response_logic(
             for char in content:
                 print(char, end="", flush=True)
                 yield char
-            yield f"\nAudio generated: {audio_file}"
+            if audio_file and os.path.exists(audio_file):
+                play_audio(audio_file)
+                yield f"\n[AUDIO_FILE:{audio_file}]"
         else:
             for char in content:
                 print(char, end="", flush=True)
