@@ -25,7 +25,85 @@ services:
     volumes:
       - open-webui:/app/backend/data
 
-  llama-full:
+  # CUDA Services (for NVIDIA GPUs)
+  llama-full-cuda:
+    image: ghcr.io/ggml-org/llama.cpp:full-cuda
+    container_name: llama-full
+    stdin_open: true
+    tty: true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: ${GPU_DEVICE_COUNT:-1}
+              capabilities: [gpu]
+    volumes:
+      - ./models:/models
+    command:
+      ["--all-in-one", "/models", "7B"]
+    profiles:
+      - cuda
+
+  llama-embed-cuda:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    container_name: llama-embed
+    restart: unless-stopped
+    ports:
+      - "${MODEL_EMBED_PORT}:8000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: ${GPU_DEVICE_COUNT:-1}
+              capabilities: [gpu]
+    volumes:
+      - ./models:/models
+    command:
+      [
+        "-m",
+        "/models/nomic-embed-text-v1.5.Q4_K_M.gguf",
+        "--port",
+        "8000",
+        "--host",
+        "0.0.0.0",
+        "--embeddings",
+      ]
+    profiles:
+      - cuda
+
+  llama-vision-cuda:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    container_name: llama-vision
+    restart: unless-stopped
+    ports:
+      - "${MODEL_MM_PORT}:8000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: ${GPU_DEVICE_COUNT:-1}
+              capabilities: [gpu]
+    volumes:
+      - ./models:/models
+    command:
+      [
+        "-m",
+        "/models/gemma-3-4b-it-Q4_K_M.gguf",
+        "--mmproj",
+        "/models/gemma-3-4b-it-Q4_K_M-mmproj.gguf",
+        "--port",
+        "8000",
+        "--host",
+        "0.0.0.0",
+      ]
+    profiles:
+      - cuda
+
+  # Vulkan Services (for AMD GPUs, Intel Arc, or fallback)
+  llama-full-vulkan:
     image: ghcr.io/ggml-org/llama.cpp:full-vulkan
     container_name: llama-full
     stdin_open: true
@@ -36,10 +114,10 @@ services:
       - ./models:/models
     command:
       ["--all-in-one", "/models", "7B"]
-      # This will attempt to download and prepare LLaMA 7B
-      # on the first container run. Requires Meta license acceptance.
+    profiles:
+      - vulkan
 
-  llama-embed:
+  llama-embed-vulkan:
     image: ghcr.io/ggml-org/llama.cpp:server-vulkan
     container_name: llama-embed
     restart: unless-stopped
@@ -59,8 +137,10 @@ services:
         "0.0.0.0",
         "--embeddings",
       ]
+    profiles:
+      - vulkan
 
-  llama-vision:
+  llama-vision-vulkan:
     image: ghcr.io/ggml-org/llama.cpp:server-vulkan
     container_name: llama-vision
     restart: unless-stopped
@@ -81,6 +161,8 @@ services:
         "--host",
         "0.0.0.0",
       ]
+    profiles:
+      - vulkan
 
 volumes:
   pgvector-data:
