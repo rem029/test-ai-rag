@@ -14,21 +14,6 @@ services:
     volumes:
       - pgvector-data:/var/lib/postgresql/data
 
-  ollama:
-    image: ollama/ollama:rocm
-    container_name: ollama
-    restart: unless-stopped
-    ports:
-      - "${OLLAMA_PORT}:11434"
-    environment:
-      OLLAMA_HOST: 0.0.0.0
-    devices:
-      - "/dev/kfd:/dev/kfd"
-      - "/dev/dri:/dev/dri"
-    volumes:
-      - ollama:/root/.ollama
-    command: serve
-
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
     container_name: open-webui
@@ -39,8 +24,6 @@ services:
       OLLAMA_BASE_URL: http://ollama:11434
     volumes:
       - open-webui:/app/backend/data
-    depends_on:
-      - ollama
 
   llama-full:
     image: ghcr.io/ggml-org/llama.cpp:full-vulkan
@@ -56,31 +39,9 @@ services:
       # This will attempt to download and prepare LLaMA 7B
       # on the first container run. Requires Meta license acceptance.
 
-  llama-qwen2-5vl-3b:
+  llama-embed:
     image: ghcr.io/ggml-org/llama.cpp:server-vulkan
-    container_name: llama-qwen2-5vl-3b
-    restart: unless-stopped
-    ports:
-      - "${MODEL_MM_PORT}:8000"
-    devices:
-      - "/dev/dri:/dev/dri"
-    volumes:
-      - ./models:/models
-    command:
-      [
-        "-m",
-        "/models/qwen2.5VL-3B-Instruct-Q4_K_M.gguf",
-        "--mmproj",
-        "/models/mmproj-F16.gguf",
-        "--port",
-        "8000",
-        "--host",
-        "0.0.0.0",
-      ]
-
-  llama-nomic-embedv1-5:
-    image: ghcr.io/ggml-org/llama.cpp:server-vulkan
-    container_name: llama-nomic-embedv1-5
+    container_name: llama-embed
     restart: unless-stopped
     ports:
       - "${MODEL_EMBED_PORT}:8000"
@@ -99,31 +60,9 @@ services:
         "--embeddings",
       ]
 
-  llama-moondream2:
+  llama-vision:
     image: ghcr.io/ggml-org/llama.cpp:server-vulkan
-    container_name: llama-moondream2
-    restart: unless-stopped
-    ports:
-      - "${MODEL_MM_PORT}:8000"
-    devices:
-      - "/dev/dri:/dev/dri"
-    volumes:
-      - ./models:/models
-    command:
-      [
-        "-m",
-        "/models/moondream2-text-model-f16.gguf",
-        "--mmproj",
-        "/models/moondream2-mmproj-f16.gguf",
-        "--port",
-        "8000",
-        "--host",
-        "0.0.0.0",
-      ]
-
-  llama-gemma3-4b:
-    image: ghcr.io/ggml-org/llama.cpp:server-vulkan
-    container_name: llama-gemma34b
+    container_name: llama-vision
     restart: unless-stopped
     ports:
       - "${MODEL_MM_PORT}:8000"
@@ -145,5 +84,4 @@ services:
 
 volumes:
   pgvector-data:
-  ollama:
   open-webui:

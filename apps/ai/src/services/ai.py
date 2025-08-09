@@ -62,8 +62,8 @@ async def stream_response_logic(
     ]
 
     recent_messages = await get_recent_messages(
-        limit=10, session_id=session_id
-    )  # Fetch the last 10 messages
+        limit=30, session_id=session_id
+    )  # Fetch the last 30 messages
     recent_messages.reverse()  # Reverse the list to maintain chronological order
 
     print("System messages:\n===\n", system_prompt, "\n===")
