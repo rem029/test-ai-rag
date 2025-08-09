@@ -10,8 +10,16 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 from rich.logging import RichHandler
+from rich.columns import Columns
+from rich.table import Table
 from datetime import datetime
 import logging
+try:
+    # Try to import PIL for image preview
+    from PIL import Image
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
 
 # Create logs directory if it doesn't exist
 LOGS_DIR = "logs"
@@ -83,11 +91,77 @@ def log_and_print(message: str, style: str = "white", log_level: str = "info"):
             session_logger.warning(clean_message)
         elif log_level.lower() == "error":
             session_logger.error(clean_message)
-        else:
-            session_logger.info(clean_message)
+def preview_image_in_terminal(image_path: str, max_width: int = 80, max_height: int = 20):
+    """
+    Preview an image in the terminal using different methods.
+    """
+    if not os.path.exists(image_path):
+        log_and_print(f"❌ [red]Image not found:[/red] [yellow]{image_path}[/yellow]", log_level="error")
+        return
+    
+    log_and_print(f"🖼️ [cyan]Previewing image:[/cyan] [yellow]{os.path.basename(image_path)}[/yellow]")
+    
+    # Method 1: Try Rich's built-in image support (if terminal supports it)
+    try:
+        # Some terminals support Rich image rendering
+        from rich.console import Console
+        preview_console = Console()
+        
+        # Create a simple ASCII art representation
+        if PIL_AVAILABLE:
+            try:
+                img = Image.open(image_path)
+                width, height = img.size
+                
+                # Create an info table about the image
+                image_info = Table(title=f"🖼️ Image Preview: {os.path.basename(image_path)}")
+                image_info.add_column("Property", style="cyan", no_wrap=True)
+                image_info.add_column("Value", style="yellow")
+                
+                image_info.add_row("File Size", f"{os.path.getsize(image_path):,} bytes")
+                image_info.add_row("Dimensions", f"{width} × {height} pixels")
+                image_info.add_row("Format", img.format if img.format else "Unknown")
+                image_info.add_row("Mode", img.mode if img.mode else "Unknown")
+                
+                console.print(image_info)
+                
+                # Simple ASCII representation
+                ascii_art = create_simple_ascii_preview(img, max_width//2, max_height//2)
+                if ascii_art:
+                    console.print(Panel(ascii_art, title="[bold blue]ASCII Preview[/bold blue]", border_style="blue"))
+                
+            except Exception as e:
+                log_and_print(f"⚠️ [yellow]Could not create detailed preview:[/yellow] [red]{e}[/red]", log_level="warning")
+        
+    except Exception as e:
+        log_and_print(f"⚠️ [yellow]Terminal image preview not available:[/yellow] [red]{e}[/red]", log_level="warning")
+
+def create_simple_ascii_preview(img, width=40, height=20):
+    """
+    Create a simple ASCII art representation of an image.
+    """
+    try:
+        # Convert to grayscale and resize
+        img_gray = img.convert('L')
+        img_resized = img_gray.resize((width, height))
+        
+        # ASCII characters from dark to light
+        ascii_chars = "@%#*+=-:. "
+        ascii_str = ""
+        
+        for y in range(height):
+            for x in range(width):
+                pixel_value = img_resized.getpixel((x, y))
+                ascii_index = min(pixel_value // 28, len(ascii_chars) - 1)
+                ascii_str += ascii_chars[ascii_index]
+            ascii_str += "\n"
+        
+        return ascii_str.rstrip()
+    except Exception as e:
+        return f"ASCII preview failed: {e}"
 
 
-def img_to_base64(image_path: str) -> str:
+def img_to_base64(image_path: str, show_preview: bool = True) -> str:
     """
     Convert an image file to a base64 encoded string.
     """
@@ -105,6 +179,10 @@ def img_to_base64(image_path: str) -> str:
             log_and_print(f"📁 [cyan]Using image path:[/cyan] [yellow]{full_image_path}[/yellow]")
         else:
             full_image_path = image_path  # Use full path if provided
+
+        # Show image preview if requested
+        if show_preview:
+            preview_image_in_terminal(full_image_path)
 
         with open(full_image_path, "rb") as image_file:
             encoded_string = base64.b64encode(image_file.read()).decode("utf-8")
@@ -343,7 +421,7 @@ def chat_with_server():
         }
 
         if use_image and image_path:
-            base64_image = img_to_base64(image_path)
+            base64_image = img_to_base64(image_path, show_preview=True)  # Enable preview
             if base64_image:
                 payload["image"] = base64_image
 
