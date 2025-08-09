@@ -326,7 +326,7 @@ def chat_with_server():
         print("─" * 40)
 
         # Initialize BaseSpeaker
-        speaker = PiperSpeaker(voice=PiperVoiceGB.ALAN)
+        speaker = PiperSpeaker(voice=PiperVoiceGB.CORI)
         # Generate audio file
         speaker.say(user_input)
 
