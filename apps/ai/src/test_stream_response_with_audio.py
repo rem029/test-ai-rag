@@ -9,7 +9,7 @@ import re
 import time
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
-
+from yapper import PiperSpeaker, PiperVoiceGB
 # Load environment variables from .env file
 load_dotenv()
 
@@ -82,25 +82,33 @@ def create_simple_ascii_preview(img, width=40, height=20):
     except Exception as e:
         return f"ASCII preview failed: {e}"
 
-
 def img_to_base64(image_path: str, show_preview: bool = True) -> str:
     """
     Convert an image file to a base64 encoded string.
     """
+    if not image_path:
+        print("❌ No image path provided.")
+        return ""
     try:
-        # If it's just a filename, prepend the uploads directory path
-        if not os.path.dirname(image_path):  # No directory in the path
-            current_dir = os.getcwd()
+        current_dir = os.getcwd()
+
+        if os.path.isabs(image_path):
+            candidate_path = image_path
+        elif not os.path.dirname(image_path):  # Just a filename
             if current_dir.endswith("src"):
-                # If we're in the src directory, go up one level to uploads
-                full_image_path = os.path.join(current_dir, "", "uploads", image_path)
+                candidate_path = os.path.join(current_dir, "uploads", image_path)
             else:
-                full_image_path = os.path.join(
-                    current_dir, "src", "uploads", image_path
-                )
-            print(f"📁 Using image path: {full_image_path}")
+                candidate_path = os.path.join(current_dir, "src", "uploads", image_path)
         else:
-            full_image_path = image_path  # Use full path if provided
+            # Relative path with a directory (e.g., uploads/foo.jpg)
+            candidate_path = os.path.join(current_dir, image_path)
+
+        # Normalize to absolute path
+        full_image_path = os.path.abspath(candidate_path)
+
+        # Debug info
+        print(f"📂 Current dir: {current_dir}")
+        print(f"📁 Using image path: {full_image_path}")
 
         # Show image preview if requested
         if show_preview:
@@ -317,6 +325,11 @@ def chat_with_server():
 
         print("─" * 40)
 
+        # Initialize BaseSpeaker
+        speaker = PiperSpeaker(voice=PiperVoiceGB.ALAN)
+        # Generate audio file
+        speaker.say(user_input)
+
         # Send the input to the /message endpoint
         payload = {
             "text": user_input,
@@ -360,12 +373,12 @@ def chat_with_server():
                             print(char, end="", flush=True)
 
                     # Play audio if available
-                    if audio_file_path and os.path.exists(audio_file_path):
-                        if play_choice != "n":
-                            play_audio(audio_file_path)
+                    # if audio_file_path and os.path.exists(audio_file_path):
+                    #     if play_choice != "n":
+                    #         play_audio(audio_file_path)
 
-                    elif audio_response and not audio_file_path:
-                        print("\n⚠️ Audio was requested but no audio file was generated.")
+                    # elif audio_response and not audio_file_path:
+                    #     print("\n⚠️ Audio was requested but no audio file was generated.")
 
                 else:
                     print(f"❌ Server error: {response.status_code}")

@@ -1,9 +1,39 @@
+import json
 import os
 import uuid
 import subprocess
 import platform
 from yapper import PiperSpeaker
 
+def _unwrap_code_fence(s: str) -> str:
+    t = s.strip()
+    if t.startswith("```"):
+        lines = t.splitlines()
+        # drop opening fence (e.g., ``` or ```json)
+        lines = lines[1:]
+        # drop closing fence if present
+        if lines and lines[-1].strip().startswith("```"):
+            lines = lines[:-1]
+        t = "\n".join(lines)
+    return t
+
+def _extract_description_or_text(text: str) -> str:
+    if not isinstance(text, str):
+        return str(text)
+    raw = _unwrap_code_fence(text)
+    try:
+        obj = json.loads(raw)
+        if isinstance(obj, dict) and isinstance(obj.get("description"), str):
+            desc = obj["description"].strip()
+            return desc or text
+        if isinstance(obj, list):
+            for item in obj:
+                if isinstance(item, dict) and isinstance(item.get("description"), str):
+                    desc = item["description"].strip()
+                    return desc or text
+    except Exception:
+        pass
+    return text
 
 async def text_to_speech_yapper(text: str) -> str:
     """
@@ -11,6 +41,7 @@ async def text_to_speech_yapper(text: str) -> str:
     Returns the path to the generated audio file.
     """
     try:
+        print("@text_to_speech_yapper creating")
         # Create output directory if it doesn't exist
         current_dir = os.getcwd()
         output_dir = os.path.join(current_dir, "tmp", "audio_output")
@@ -20,10 +51,12 @@ async def text_to_speech_yapper(text: str) -> str:
         filename = f"audio_{uuid.uuid4().hex[:8]}.wav"
         filepath = os.path.join(output_dir, filename)
 
+        # Try to parse JSON and prefer `description`
+        processed_text = _extract_description_or_text(text)
         # Initialize PiperSpeaker
         speaker = PiperSpeaker()
-        # Generate audio file
-        speaker.text_to_wave(text, filepath)
+        # Generate audio file using processed text
+        speaker.text_to_wave(processed_text, filepath)
 
         print(f"Audio file generated: {filepath}")
         return filepath
