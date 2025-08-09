@@ -12,8 +12,6 @@ DB_CONFIG = {
     "password": os.getenv("POSTGRES_PASSWORD", "123"),
 }
 
-OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-
 MODEL_PORT = {
     "main": os.getenv("PORT_MODEL_MM", "http://localhost:9001"),
     "embed": os.getenv("PORT_MODEL_EMBED", "http://localhost:9002"),

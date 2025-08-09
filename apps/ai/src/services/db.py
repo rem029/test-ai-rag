@@ -1,9 +1,12 @@
 from typing import Optional
 import psycopg2
+from services.logger import get_logger
 from utils.constants import DB_CONFIG
 
 # Global database connection
 _db_connection = None
+
+logger = get_logger()
 
 def get_db_connection():
     """Get a database cursor using a persistent connection from constants.py"""
@@ -11,7 +14,9 @@ def get_db_connection():
     
     # Check if connection exists and is still valid
     if _db_connection is None or _db_connection.closed:
-        print("Creating new database connection...")
+        logger.log_and_print("Creating new database connection...")
+        logger.log_and_print("DB Config:", DB_CONFIG)
+
         _db_connection = psycopg2.connect(
             host=DB_CONFIG["host"],
             port=DB_CONFIG["port"],
@@ -29,7 +34,9 @@ def get_db_connection_instance():
     
     # Check if connection exists and is still valid
     if _db_connection is None or _db_connection.closed:
-        print("Creating new database connection...")
+        logger.log_and_print("Creating new database connection...")
+        logger.log_and_print("DB Config:", DB_CONFIG)
+
         _db_connection = psycopg2.connect(
             host=DB_CONFIG["host"],
             port=DB_CONFIG["port"],
@@ -44,7 +51,7 @@ def get_db_connection_instance():
 def initialize_database():
     """Function to initialize the database and create tables"""
     try:
-        print("Attempting to connect to the database...")
+        logger.log_and_print("Attempting to connect to the database...")
         connection = get_db_connection_instance()
         cursor = connection.cursor()
 
@@ -65,9 +72,9 @@ def initialize_database():
 
         connection.commit()
         cursor.close()
-        print("Database connection successful and table initialized.")
+        logger.log_and_print("Database connection successful and table initialized.")
     except psycopg2.Error as e:
-        print("Failed to connect to the database or initialize table:", e)
+        logger.log_and_print("Failed to connect to the database or initialize table:", e)
 
 
 async def get_embeddings_from_db(embedding: dict):
@@ -100,10 +107,10 @@ async def save_message(message: str, role: str, embedding: dict, session_id: Opt
     connection = get_db_connection_instance()
     cursor = connection.cursor()
     effective_session_id = session_id if session_id is not None else 'default_session'
-    print("Saving message to database for session:", effective_session_id)
+    logger.log_and_print("Saving message to database for session:", effective_session_id)
     try:
         if not message or embedding is None:
-            print("Message or embedding is None, skipping save.")
+            logger.log_and_print("Message or embedding is None, skipping save.")
             return
         cursor.execute(
             """
@@ -114,7 +121,7 @@ async def save_message(message: str, role: str, embedding: dict, session_id: Opt
         )
         connection.commit()
     except psycopg2.Error as e:
-        print("Database error:", e)
+        logger.log_and_print("Database error:", e)
         connection.rollback()  # Rollback the transaction
     finally:
         cursor.close()
@@ -127,7 +134,7 @@ async def get_recent_messages(limit: int, session_id: Optional[str] = None):
     """
     cursor = get_db_connection()
     effective_session_id = session_id if session_id is not None else 'default_session'
-    print("Fetching recent messages for session:", effective_session_id)
+    logger.log_and_print("Fetching recent messages for session:", effective_session_id)
     try:
         cursor.execute(
             """
@@ -145,7 +152,7 @@ async def get_recent_messages(limit: int, session_id: Optional[str] = None):
             {"message": row[0], "role": row[1], "created_at": row[2]} for row in results
         ]
     except psycopg2.Error as e:
-        print("Database error while fetching recent messages:", e)
+        logger.log_and_print("Database error while fetching recent messages:", e)
         return []
     finally:
         cursor.close()

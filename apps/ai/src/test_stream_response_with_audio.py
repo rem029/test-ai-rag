@@ -6,14 +6,16 @@ import uuid
 import subprocess
 import platform
 import re
-from rich.console import Console
-from rich.panel import Panel
-from rich.text import Text
-from rich.logging import RichHandler
-from rich.columns import Columns
-from rich.table import Table
-from datetime import datetime
-import logging
+import time
+from datetime import datetime, timedelta
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Get API base URL from environment variable
+API_BASE_URL = os.getenv('API_BASE_URL', 'http://localhost:8000')
+
 try:
     # Try to import PIL for image preview
     from PIL import Image
@@ -21,120 +23,40 @@ try:
 except ImportError:
     PIL_AVAILABLE = False
 
-# Create logs directory if it doesn't exist
-LOGS_DIR = "logs"
-os.makedirs(LOGS_DIR, exist_ok=True)
-
-# Initialize Rich console with file recording
-console = Console(record=True)
-
-# Set up beautiful logging with Rich
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(message)s",
-    handlers=[RichHandler(console=console, rich_tracebacks=True)]
-)
-logger = logging.getLogger("RobotNavBrain")
-
-# Global variables for logging
-session_logger = None
-log_file_path = None
-
-def setup_session_logging(session_id: str):
-    """
-    Set up logging for a specific session.
-    Creates a session-specific log file and configures logging.
-    """
-    global session_logger, log_file_path
-    
-    # Create session-specific log filename with timestamp
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_filename = f"robotnav_session_{session_id[:8]}_{timestamp}.log"
-    log_file_path = os.path.join(LOGS_DIR, log_filename)
-    
-    # Create session logger
-    session_logger = logging.getLogger(f"Session_{session_id[:8]}")
-    session_logger.setLevel(logging.INFO)
-    
-    # Remove existing handlers
-    session_logger.handlers.clear()
-    
-    # Create file handler for session logs
-    file_handler = logging.FileHandler(log_file_path, encoding='utf-8')
-    file_formatter = logging.Formatter(
-        '%(asctime)s | %(name)s | %(levelname)s | %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    file_handler.setFormatter(file_formatter)
-    session_logger.addHandler(file_handler)
-    
-    return log_file_path
-
-def log_and_print(message: str, style: str = "white", log_level: str = "info"):
-    """
-    Print to console with Rich formatting AND log to session file.
-    """
-    global session_logger
-    
-    # Print to console with Rich formatting
-    console.print(message)
-    
-    # Log to session file (strip Rich formatting for clean log)
-    if session_logger:
-        # Remove Rich markup for clean file logging
-        clean_message = re.sub(r'\[.*?\]', '', message)
-        clean_message = re.sub(r'[🤖📁✅❌🔊🎵⚠️💭📷🖼️🚫💤📸─]', '', clean_message).strip()
-        
-        if log_level.lower() == "info":
-            session_logger.info(clean_message)
-        elif log_level.lower() == "warning":
-            session_logger.warning(clean_message)
-        elif log_level.lower() == "error":
-            session_logger.error(clean_message)
 def preview_image_in_terminal(image_path: str, max_width: int = 80, max_height: int = 20):
     """
     Preview an image in the terminal using different methods.
     """
     if not os.path.exists(image_path):
-        log_and_print(f"❌ [red]Image not found:[/red] [yellow]{image_path}[/yellow]", log_level="error")
+        print(f"❌ Image not found: {image_path}")
         return
     
-    log_and_print(f"🖼️ [cyan]Previewing image:[/cyan] [yellow]{os.path.basename(image_path)}[/yellow]")
+    print(f"🖼️ Previewing image: {os.path.basename(image_path)}")
     
-    # Method 1: Try Rich's built-in image support (if terminal supports it)
-    try:
-        # Some terminals support Rich image rendering
-        from rich.console import Console
-        preview_console = Console()
-        
-        # Create a simple ASCII art representation
-        if PIL_AVAILABLE:
-            try:
-                img = Image.open(image_path)
-                width, height = img.size
+    # Create a simple ASCII art representation
+    if PIL_AVAILABLE:
+        try:
+            img = Image.open(image_path)
+            width, height = img.size
+            
+            # Print image info
+            print(f"   📊 File Size: {os.path.getsize(image_path):,} bytes")
+            print(f"   📐 Dimensions: {width} × {height} pixels")
+            print(f"   🗂️ Format: {img.format if img.format else 'Unknown'}")
+            print(f"   🎨 Mode: {img.mode if img.mode else 'Unknown'}")
+            
+            # Simple ASCII representation
+            ascii_art = create_simple_ascii_preview(img, max_width//2, max_height//2)
+            if ascii_art:
+                print("   📺 ASCII Preview:")
+                for line in ascii_art.split('\n'):
+                    print(f"   {line}")
                 
-                # Create an info table about the image
-                image_info = Table(title=f"🖼️ Image Preview: {os.path.basename(image_path)}")
-                image_info.add_column("Property", style="cyan", no_wrap=True)
-                image_info.add_column("Value", style="yellow")
-                
-                image_info.add_row("File Size", f"{os.path.getsize(image_path):,} bytes")
-                image_info.add_row("Dimensions", f"{width} × {height} pixels")
-                image_info.add_row("Format", img.format if img.format else "Unknown")
-                image_info.add_row("Mode", img.mode if img.mode else "Unknown")
-                
-                console.print(image_info)
-                
-                # Simple ASCII representation
-                ascii_art = create_simple_ascii_preview(img, max_width//2, max_height//2)
-                if ascii_art:
-                    console.print(Panel(ascii_art, title="[bold blue]ASCII Preview[/bold blue]", border_style="blue"))
-                
-            except Exception as e:
-                log_and_print(f"⚠️ [yellow]Could not create detailed preview:[/yellow] [red]{e}[/red]", log_level="warning")
-        
-    except Exception as e:
-        log_and_print(f"⚠️ [yellow]Terminal image preview not available:[/yellow] [red]{e}[/red]", log_level="warning")
+        except Exception as e:
+            print(f"⚠️ Could not create detailed preview: {e}")
+    
+    else:
+        print("⚠️ PIL not available for image preview")
 
 def create_simple_ascii_preview(img, width=40, height=20):
     """
@@ -176,7 +98,7 @@ def img_to_base64(image_path: str, show_preview: bool = True) -> str:
                 full_image_path = os.path.join(
                     current_dir, "src", "uploads", image_path
                 )
-            log_and_print(f"📁 [cyan]Using image path:[/cyan] [yellow]{full_image_path}[/yellow]")
+            print(f"📁 Using image path: {full_image_path}")
         else:
             full_image_path = image_path  # Use full path if provided
 
@@ -186,13 +108,13 @@ def img_to_base64(image_path: str, show_preview: bool = True) -> str:
 
         with open(full_image_path, "rb") as image_file:
             encoded_string = base64.b64encode(image_file.read()).decode("utf-8")
-            log_and_print(f"✅ [green]Successfully encoded image:[/green] [blue]{os.path.basename(full_image_path)}[/blue]")
+            print(f"✅ Successfully encoded image: {os.path.basename(full_image_path)}")
             return encoded_string
     except FileNotFoundError:
-        log_and_print(f"❌ [red]Image file not found:[/red] [yellow]{full_image_path}[/yellow]", log_level="error")
+        print(f"❌ Image file not found: {full_image_path}")
         return ""
     except Exception as e:
-        log_and_print(f"❌ [red]Error reading image file:[/red] [yellow]{e}[/yellow]", log_level="error")
+        print(f"❌ Error reading image file: {e}")
         return ""
 
 
@@ -202,7 +124,7 @@ def play_audio(file_path: str):
     """
     try:
         system = platform.system()
-        log_and_print(f"🔊 [blue]Attempting to play audio on {system}:[/blue] [yellow]{os.path.basename(file_path)}[/yellow]")
+        print(f"🔊 Attempting to play audio on {system}: {os.path.basename(file_path)}")
         
         if system == "Linux":
             # Try multiple audio players in order of preference
@@ -222,16 +144,16 @@ def play_audio(file_path: str):
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
                     )
-                    log_and_print(f"🎵 [green]Playing audio with[/green] [bold cyan]{player_cmd[0]}[/bold cyan]")
+                    print(f"🎵 Playing audio with {player_cmd[0]}")
                     break
                 except (subprocess.CalledProcessError, FileNotFoundError):
                     continue
             else:
-                log_and_print("⚠️ [yellow]No suitable audio player found[/yellow]", log_level="warning")
+                print("⚠️ No suitable audio player found")
 
         elif system == "Darwin":  # macOS
             subprocess.run(["afplay", file_path], check=True)
-            log_and_print("🎵 [green]Playing audio with[/green] [bold cyan]afplay[/bold cyan]")
+            print("🎵 Playing audio with afplay")
         elif system == "Windows":
             subprocess.run(
                 [
@@ -241,13 +163,13 @@ def play_audio(file_path: str):
                 ],
                 check=True,
             )
-            log_and_print("🎵 [green]Playing audio with[/green] [bold cyan]PowerShell[/bold cyan]")
+            print("🎵 Playing audio with PowerShell")
         else:
-            log_and_print(f"❌ [red]Unsupported system:[/red] [yellow]{system}[/yellow]", log_level="error")
+            print(f"❌ Unsupported system: {system}")
     except subprocess.CalledProcessError as e:
-        log_and_print(f"❌ [red]Error playing audio:[/red] [yellow]{e}[/yellow]", log_level="error")
+        print(f"❌ Error playing audio: {e}")
     except FileNotFoundError:
-        log_and_print("❌ [red]Audio player not found. Please install required audio tools.[/red]", log_level="error")
+        print("❌ Audio player not found. Please install required audio tools.")
 
 def build_context () -> str:
      # Concise description context
@@ -324,31 +246,15 @@ def build_context () -> str:
     return context_default
 
 def chat_with_server():
-    import random
-    import time
     session_id = str(uuid.uuid4())
     
-    # Setup session-specific logging
-    log_path = setup_session_logging(session_id)
-    
     # Beautiful session start
-    session_start_panel = Panel.fit(
-        f"🤖 [bold green]RobotNavBrain Chat Client Started[/bold green]\n"
-        f"📅 [cyan]Time:[/cyan] [yellow]{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}[/yellow]\n"
-        f"🆔 [cyan]Session ID:[/cyan] [blue]{session_id}[/blue]\n"
-        f"📄 [cyan]Log File:[/cyan] [magenta]{log_path}[/magenta]",
-        title="[bold magenta]AI Chat Session[/bold magenta]",
-        border_style="green"
-    )
-    console.print(session_start_panel)
-    
-    # Log session start
-    if session_logger:
-        session_logger.info(f"=== RobotNavBrain Chat Session Started ===")
-        session_logger.info(f"Session ID: {session_id}")
-        session_logger.info(f"Start Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        session_logger.info(f"Log File: {log_path}")
-        session_logger.info("=" * 50)
+    print("=" * 60)
+    print("🤖 RobotNavBrain Chat Client Started")
+    print(f"📅 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"🆔 Session ID: {session_id}")
+    print(f"🌐 API URL: {API_BASE_URL}")
+    print("=" * 60)
 
     # List of possible user prompts (directions/questions) as objects
     user_inputs = [
@@ -375,9 +281,9 @@ def chat_with_server():
             f for f in os.listdir(image_dir)
             if f.lower().endswith(valid_extensions) and os.path.isfile(os.path.join(image_dir, f))
         ]
-        log_and_print(f"📸 [green]Found {len(image_filenames)} images in[/green] [cyan]{image_dir}[/cyan]")
+        print(f"📸 Found {len(image_filenames)} images in {image_dir}")
     except Exception as e:
-        log_and_print(f"❌ [red]Error reading image files from {image_dir}:[/red] [yellow]{e}[/yellow]", log_level="error")
+        print(f"❌ Error reading image files from {image_dir}: {e}")
         image_filenames = []
 
 
@@ -386,7 +292,7 @@ def chat_with_server():
     play_choice = "y"  # Always play audio
 
     while True:
-        log_and_print("\n" + "─" * 60)
+        print("\n" + "─" * 60)
 
         # Always use the default context
         context = context_default
@@ -399,17 +305,17 @@ def chat_with_server():
         image_filename = random.choice(image_filenames) if image_filenames else None
         image_path = f"{image_dir}/{image_filename}" if image_filename else None
 
-        # Beautiful request info with logging
-        log_and_print(f"💭 [bold blue]User input:[/bold blue] [white]{user_input}[/white]")
-        log_and_print(f"📷 [bold blue]Use image:[/bold blue] [{'green' if use_image else 'red'}]{use_image}[/{'green' if use_image else 'red'}]")
+        # Beautiful request info
+        print(f"💭 User input: {user_input}")
+        print(f"📷 Use image: {use_image}")
         if use_image and image_path:
-            log_and_print(f"🖼️  [bold blue]Image path:[/bold blue] [yellow]{image_path}[/yellow]")
+            print(f"🖼️ Image path: {image_path}")
         else:
-            log_and_print("🚫 [dim]No image will be attached.[/dim]")
+            print("🚫 No image will be attached.")
 
         audio_response = True  # Always play audio
 
-        log_and_print("─" * 40)
+        print("─" * 40)
 
         # Send the input to the /message endpoint
         payload = {
@@ -429,18 +335,14 @@ def chat_with_server():
 
         with httpx.Client(timeout=300.0) as client:
             with client.stream(
-                "POST", "http://192.168.18.101:8000/message", json=payload, headers=headers
+                "POST", f"{API_BASE_URL}/message", json=payload, headers=headers
             ) as response:
-                log_and_print("🤖 [bold green]Mary Test Response:[/bold green]")
-                log_and_print("─" * 40)
+                print("🤖 Mary Test Response:")
+                print("─" * 40)
                 
                 if response.status_code == 200:
                     full_response = ""
                     audio_file_path = None
-
-                    # Log the start of response streaming
-                    if session_logger:
-                        session_logger.info("SERVER RESPONSE: Starting to receive streamed response")
 
                     # Stream the server's response character by character
                     for char in response.iter_text():
@@ -452,19 +354,10 @@ def chat_with_server():
                             match = re.search(r"\[AUDIO_FILE:(.*?)\]", full_response)
                             if match:
                                 audio_file_path = match.group(1)
-                                console.print()
-                                # Log the complete response
-                                if session_logger:
-                                    clean_response = re.sub(r'\[AUDIO_FILE:.*?\]', '', full_response).strip()
-                                    session_logger.info(f"SERVER RESPONSE: {clean_response}")
-                                    session_logger.info(f"AUDIO FILE GENERATED: {audio_file_path}")
+                                print()
                                 break
                         else:
                             print(char, end="", flush=True)
-                    
-                    # If no audio marker was found, log the complete response
-                    if not audio_file_path and session_logger:
-                        session_logger.info(f"SERVER RESPONSE: {full_response}")
 
                     # Play audio if available
                     if audio_file_path and os.path.exists(audio_file_path):
@@ -472,18 +365,14 @@ def chat_with_server():
                             play_audio(audio_file_path)
 
                     elif audio_response and not audio_file_path:
-                        log_and_print(
-                            "\n⚠️ [yellow]Audio was requested but no audio file was generated.[/yellow]",
-                            log_level="warning"
-                        )
+                        print("\n⚠️ Audio was requested but no audio file was generated.")
 
                 else:
-                    log_and_print(f"❌ [red]Server error:[/red] [bold red]{response.status_code}[/bold red]", log_level="error")
+                    print(f"❌ Server error: {response.status_code}")
 
         # Sleep for 15 seconds after each request
-        from datetime import timedelta
         next_time = datetime.now() + timedelta(seconds=15)
-        log_and_print(f"\n💤 [dim]Sleeping for 15 seconds... (Next request at {next_time.strftime('%H:%M:%S')})[/dim]")
+        print(f"\n💤 Sleeping for 15 seconds... (Next request at {next_time.strftime('%H:%M:%S')})")
         time.sleep(15)
 
 
@@ -492,15 +381,6 @@ if __name__ == "__main__":
     try:
         chat_with_server()
     except KeyboardInterrupt:
-        if session_logger:
-            session_logger.info("=== Session terminated by user ===")
-            session_logger.info(f"End Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        console.print("\n🛑 [red]Session terminated by user.[/red]")
+        print("\n🛑 Session terminated by user.")
     except Exception as e:
-        if session_logger:
-            session_logger.error(f"Session ended with error: {e}")
-            session_logger.info(f"End Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        console.print(f"\n❌ [red]Session ended with error:[/red] [yellow]{e}[/yellow]")
-    finally:
-        if log_file_path:
-            console.print(f"\n📄 [green]Session logs saved to:[/green] [blue]{log_file_path}[/blue]")
+        print(f"\n❌ Session ended with error: {e}")

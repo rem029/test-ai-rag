@@ -96,6 +96,9 @@ LLAMA_PORT=8000          # Main API
 MODEL_MM_PORT=9001       # Vision/Multimodal service
 MODEL_EMBED_PORT=9002    # Embedding service
 
+# API Configuration
+API_BASE_URL=http://localhost:8000  # Base URL for AI service API
+
 # GPU Configuration (auto-configured by gpu-setup.sh)
 GPU_BACKEND=cuda         # Options: 'cuda' or 'vulkan'
 GPU_DEVICE_COUNT=1       # Number of GPUs to use
