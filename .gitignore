@@ -9,6 +9,8 @@ apps/ai/.venv/
 
 # Logs
 *.log
+logs
+logs/*
 
 # Compiled Python files
 *.pyc
