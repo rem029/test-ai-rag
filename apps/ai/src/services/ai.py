@@ -49,6 +49,181 @@ def end_session_logging(session_id: str, reason: str = "Normal termination"):
     logger.log_and_print(f"📄 [blue]Session {session_id[:8]} ended:[/blue] [yellow]{reason}[/yellow]")
 
 
+async def build_context(
+    text: str, 
+    context: Optional[str] = None
+) -> tuple[str, list]:
+    """
+    Build system prompt and context from embedding search.
+    
+    Args:
+        text: User input text
+        context: Optional custom context to override default
+        
+    Returns:
+        tuple: (system_prompt, db_embeddings)
+    """
+    logger = get_logger()
+    
+    # Embedding and response generation logic
+    embedding = await embed_text(text)
+    db_embeddings = await get_embeddings_from_db(embedding)
+    
+    # Log embedding context
+    logger.log_embedding_context(len(db_embeddings))
+
+    # Convert embedding to a string representation for context
+    embedding_context = "\n".join([f"- {item['message']}" for item in db_embeddings])
+
+    if context:
+        system_prompt = f"{context}\n"
+        system_prompt += f"{embedding_context}"
+    else:
+        system_prompt = (
+            "You are Mary Test's official support agent.\n\n"
+            "Behavior Rules:\n"
+            "- If greeted politely (e.g., 'hello', 'hi', 'good morning'), respond with:\n"
+            '  "Hello, I am Mary Test\'s official support agent. How can I assist you today?"\n'
+            "- If the question is NOT related to Mary Test, respond with:\n"
+            '  "I\'m sorry, I can only answer questions about Mary Test."\n\n'
+            "Topic Restriction:\n"
+            "You are only allowed to answer questions directly related to the company Mary Test. "
+            "Do not respond to general tech queries, personal questions, or anything outside the company's scope.\n\n"
+            "You may only use the facts below to answer questions. Do not fabricate or assume details.\n\n"
+            f"{embedding_context}\n"
+            "Strictly respond using information from the list above."
+        )
+    
+    # Log system prompt
+    logger.log_system_prompt(system_prompt)
+    
+    return system_prompt, db_embeddings
+
+
+async def build_messages(
+    system_prompt: str,
+    text: str, 
+    image_base64: Optional[str],
+    session_id: str
+) -> list:
+    """
+    Build the messages array including system prompt, recent messages, and current user input.
+    
+    Args:
+        system_prompt: The system prompt to use
+        text: Current user input text
+        image_base64: Optional base64 encoded image
+        session_id: Current session ID
+        
+    Returns:
+        list: Complete messages array for the model
+    """
+    logger = get_logger()
+    
+    messages = [
+        {"role": "system", "content": system_prompt},
+    ]
+
+    recent_messages = await get_recent_messages(
+        limit=30, session_id=session_id
+    )  # Fetch the last 30 messages
+    recent_messages.reverse()  # Reverse the list to maintain chronological order
+
+    # Log recent messages instead of printing
+    logger.log_recent_messages(recent_messages)
+
+    for msg in recent_messages:
+        messages.append({"role": msg["role"], "content": msg["message"]})
+
+    if image_base64:
+        messages.append(
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": text},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{image_base64}"},
+                    },
+                ],
+            }
+        )
+    else:
+        messages.append({"role": "user", "content": text})
+    
+    return messages
+
+
+async def handle_audio_response(text_response: str, audioResponse: bool) -> Optional[str]:
+    """
+    Handle text-to-speech audio generation if requested.
+    
+    Args:
+        text_response: The text to convert to speech
+        audioResponse: Whether audio response is requested
+        
+    Returns:
+        Optional[str]: Path to generated audio file, or None if no audio requested/failed
+    """
+    logger = get_logger()
+    
+    if not audioResponse:
+        return None
+        
+    try:
+        audio_file_path = await text_to_speech_yapper(text_response)
+        if audio_file_path and os.path.exists(audio_file_path):
+            play_audio(audio_file_path)
+            return audio_file_path
+    except Exception as e:
+        logger.log_error(f"Audio generation failed: {str(e)}", "AUDIO_ERROR")
+    
+    return None
+
+
+async def stream_model_response(messages: list, stream: bool):
+    """
+    Handle the actual model response streaming or non-streaming.
+    
+    Args:
+        messages: The messages to send to the model
+        stream: Whether to use streaming mode
+        
+    Yields:
+        str: Response content chunks
+    """
+    logger = get_logger()
+    
+    if stream:
+        # Use OpenAI's async streaming API
+        stream_resp = await model_main.chat.completions.create(
+            model="",
+            messages=messages,
+            stream=True,
+        )
+        async for part in stream_resp:
+            content = part.choices[0].delta.content or ""
+            finish_reason = part.choices[0].finish_reason or None
+
+            if finish_reason == "stop":
+                if hasattr(part, "usage"):
+                    token_info = f"Tokens used: {getattr(part.usage, 'total_tokens', 0)}"
+                    logger.log_and_print(f"\n📊 [cyan]{token_info}[/cyan]")
+            for char in content:
+                print(char, end="", flush=True)
+                yield char
+    else:
+        response = await model_main.chat.completions.create(
+            model="",
+            messages=messages,
+            stream=False,
+        )
+        content = response.choices[0].message.content
+        for char in content:
+            print(char, end="", flush=True)
+            yield char
+
+
 async def stream_response_logic(
     session_id: str,
     text: str,
@@ -62,7 +237,6 @@ async def stream_response_logic(
     The text is sent as input, and the embedding is sent as context.
     Defaults context to null if no embedding is found.
     """
-    # Get logger instance
     logger = get_logger()
     
     try:
@@ -75,69 +249,14 @@ async def stream_response_logic(
         image_info = "Image attached" if image_base64 else "No image"
         logger.log_user_input(session_id, text, bool(image_base64), image_info)
         
-        # Embedding and response generation logic
+        # Build context and system prompt
+        system_prompt, db_embeddings = await build_context(text, context)
+        
+        # Build complete messages array
+        messages = await build_messages(system_prompt, text, image_base64, session_id)
+
+        # Save user message to database
         embedding = await embed_text(text)
-        db_embeddings = await get_embeddings_from_db(embedding)
-        
-        # Log embedding context
-        logger.log_embedding_context(len(db_embeddings))
-
-        # Convert embedding to a string representation for context
-        embedding_context = "\n".join([f"- {item['message']}" for item in db_embeddings])
-
-        if context:
-            system_prompt = f"{context}\n"
-            system_prompt += f"{embedding_context}"
-        else:
-            system_prompt = (
-                "You are Mary Test's official support agent.\n\n"
-                "Behavior Rules:\n"
-                "- If greeted politely (e.g., 'hello', 'hi', 'good morning'), respond with:\n"
-                '  "Hello, I am Mary Test\'s official support agent. How can I assist you today?"\n'
-                "- If the question is NOT related to Mary Test, respond with:\n"
-                '  "I\'m sorry, I can only answer questions about Mary Test."\n\n'
-                "Topic Restriction:\n"
-                "You are only allowed to answer questions directly related to the company Mary Test. "
-                "Do not respond to general tech queries, personal questions, or anything outside the company's scope.\n\n"
-                "You may only use the facts below to answer questions. Do not fabricate or assume details.\n\n"
-                f"{embedding_context}\n"
-                "Strictly respond using information from the list above."
-            )
-        
-        # Log system prompt
-        logger.log_system_prompt(system_prompt)
-
-        messages = [
-            {"role": "system", "content": system_prompt},
-        ]
-
-        recent_messages = await get_recent_messages(
-            limit=30, session_id=session_id
-        )  # Fetch the last 30 messages
-        recent_messages.reverse()  # Reverse the list to maintain chronological order
-
-        # Log recent messages instead of printing
-        logger.log_recent_messages(recent_messages)
-
-        for msg in recent_messages:
-            messages.append({"role": msg["role"], "content": msg["message"]})
-
-        if image_base64:
-            messages.append(
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": text},
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": f"data:image/png;base64,{image_base64}"},
-                        },
-                    ],
-                }
-            )
-        else:
-            messages.append({"role": "user", "content": text})
-
         await save_message(text, "user", embedding, session_id)
 
         # ---------------------------------------------------------
@@ -153,73 +272,24 @@ async def stream_response_logic(
         logger.log_ai_response_start()
         logger.log_and_print("🤖 [bold green]AI Response:[/bold green]")
         
-        if stream:
-            text_response = ""
-            audio_file_path = None
-            # Use OpenAI's async streaming API
-            stream_resp = await model_main.chat.completions.create(
-                model="",
-                messages=messages,
-                stream=True,
-            )
-            async for part in stream_resp:
-                content = part.choices[0].delta.content or ""
-                finish_reason = part.choices[0].finish_reason or None
-
-                if finish_reason == "stop":
-                    if hasattr(part, "usage"):
-                        token_info = f"Tokens used: {getattr(part.usage, 'total_tokens', 0)}"
-                        logger.log_and_print(f"\n📊 [cyan]{token_info}[/cyan]")
-                for char in content:
-                    text_response += char
-                    print(char, end="", flush=True)
-                    yield char
+        # Stream the model response
+        text_response = ""
+        async for chunk in stream_model_response(messages, stream):
+            text_response += chunk
+            yield chunk
+        
+        # Save assistant response to database
+        response_embedding = await embed_text(text_response)
+        await save_message(text_response, "assistant", response_embedding, session_id)
+        
+        # Handle audio response if requested
+        audio_file_path = await handle_audio_response(text_response, audioResponse)
+        
+        if audio_file_path:
+            yield f"\n[AUDIO_FILE:{audio_file_path}]"
             
-            embedding = await embed_text(text_response)
-            await save_message(text_response, "assistant", embedding, session_id)
-            
-            if audioResponse:
-                try:
-                    audio_file_path = await text_to_speech_yapper(text_response)
-                    if audio_file_path and os.path.exists(audio_file_path):
-                        play_audio(audio_file_path)
-                        yield f"\n[AUDIO_FILE:{audio_file_path}]"
-                except Exception as e:
-                    logger.log_error(f"Audio generation failed: {str(e)}", "AUDIO_ERROR")
-            
-            # Log the complete response
-            logger.log_ai_response(text_response, audio_file_path)
-            
-        else:
-            response = await model_main.chat.completions.create(
-                model="",
-                messages=messages,
-                stream=False,
-            )
-            content = response.choices[0].message.content
-            embedding = await embed_text(content)
-            await save_message(content, "assistant", embedding, session_id)
-
-            audio_file_path = None
-            if audioResponse:
-                try:
-                    audio_file_path = await text_to_speech_yapper(content)
-                except Exception as e:
-                    logger.log_error(f"Audio generation failed: {str(e)}", "AUDIO_ERROR")
-                
-            for char in content:
-                print(char, end="", flush=True)
-                yield char
-                
-            if audio_file_path and os.path.exists(audio_file_path):
-                try:
-                    play_audio(audio_file_path)
-                    yield f"\n[AUDIO_FILE:{audio_file_path}]"
-                except Exception as e:
-                    logger.log_error(f"Audio playback failed: {str(e)}", "AUDIO_ERROR")
-            
-            # Log the complete response
-            logger.log_ai_response(content, audio_file_path)
+        # Log the complete response
+        logger.log_ai_response(text_response, audio_file_path)
             
     except Exception as e:
         logger.log_error(f"Error in stream_response_logic: {str(e)}", "STREAM_ERROR")
