@@ -15,6 +15,7 @@ load_dotenv()
 
 # Get API base URL from environment variable
 API_BASE_URL = os.getenv('API_BASE_URL', 'http://localhost:8000')
+DEFAULT_SESSION_ID = os.getenv('DEFAULT_SESSION_ID', str(uuid.uuid4()))
 
 try:
     # Try to import PIL for image preview
@@ -228,6 +229,7 @@ def build_context () -> str:
         "description": "<short description + feeling/reason>",
         "direction": "forward" | "left" | "right" | "backward" | "stop",
         "distance_m": <float, meters to move (0 if stop)>
+        "goal_found": <boolean, true if found, false if not found>
         }
 
         Examples:
@@ -235,16 +237,19 @@ def build_context () -> str:
         "description": "Cat spotted slightly right; moving right slowly with excitement",
         "direction": "right",
         "distance_m": 0.3
+        "goal_found": true,
         }
         {
         "description": "Front blocked, left clear; turning left cautiously",
         "direction": "left",
         "distance_m": 0.4
+        "goal_found": false,
         }
         {
         "description": "No safe path visible; stopping to reassess",
         "direction": "stop",
         "distance_m": 0.0
+        "goal_found": false,
         }
 
         ---
@@ -254,7 +259,7 @@ def build_context () -> str:
     return context_default
 
 def chat_with_server():
-    session_id = str(uuid.uuid4())
+    session_id = DEFAULT_SESSION_ID
     
     # Beautiful session start
     print("=" * 60)

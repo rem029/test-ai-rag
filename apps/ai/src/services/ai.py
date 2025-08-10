@@ -7,18 +7,6 @@ from services.clients import model_main
 from services.logger import get_logger
 
 
-async def analyze_image(image_data: str) -> str:
-    """
-    Analyze the given image and return a description.
-    """
-    logger = get_logger()
-    logger.log_and_print("🖼️ [cyan]Analyzing image...[/cyan]")
-    
-    # Placeholder logic for vision analysis
-    # TODO: Implement actual vision analysis
-    logger.log_and_print("⚠️ [yellow]Vision analysis not yet implemented[/yellow]", log_level="warning")
-    return "Image analysis functionality is not yet implemented."
-
 
 def initialize_session_logging(session_id: str) -> str:
     """
@@ -161,6 +149,7 @@ async def stream_response_logic(
                 model="",
                 messages=messages,
                 stream=True,
+                temperature=0.1,
             )
             async for part in stream_resp:
                 content = part.choices[0].delta.content or ""
@@ -195,6 +184,7 @@ async def stream_response_logic(
                 model="",
                 messages=messages,
                 stream=False,
+                temperature=0.1,
             )
             content = response.choices[0].message.content
             embedding = await embed_text(content)
