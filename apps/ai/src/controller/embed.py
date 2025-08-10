@@ -1,5 +1,5 @@
 import psycopg2
-from services.ai import embed_text
+from services.embed import embed_text
 from services.db import save_message
 
 
