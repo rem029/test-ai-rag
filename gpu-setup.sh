@@ -11,7 +11,20 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
+
 NC='\033[0m' # No Color
+
+# Detect container engine (docker or podman)
+detect_container_engine() {
+    if command -v docker &> /dev/null; then
+        CONTAINER_CMD="docker"
+    elif command -v podman &> /dev/null; then
+        CONTAINER_CMD="podman"
+    else
+        print_error "Neither Docker nor Podman is installed. Please install one to continue."
+        exit 1
+    fi
+}
 
 # Default values
 DEFAULT_GPU_BACKEND="vulkan"
@@ -121,28 +134,31 @@ show_config() {
     fi
 }
 
+
 # Function to start services with correct profile
 start_services() {
     local gpu_backend=$1
     local services=$2
-    
+
+    detect_container_engine
     print_info "Starting services with $gpu_backend backend..."
-    
+
     if [ -z "$services" ]; then
         # Start all services with the specified profile
-        docker compose --profile "$gpu_backend" up -d
+        $CONTAINER_CMD compose --profile "$gpu_backend" up -d
     else
         # Start specific services
-        docker compose --profile "$gpu_backend" up -d $services
+        $CONTAINER_CMD compose --profile "$gpu_backend" up -d $services
     fi
-    
+
     print_success "Services started successfully!"
 }
 
 # Function to stop all services
 stop_services() {
+    detect_container_engine
     print_info "Stopping all services..."
-    docker compose --profile cuda --profile vulkan down
+    $CONTAINER_CMD compose --profile cuda --profile vulkan down
     print_success "All services stopped!"
 }
 
