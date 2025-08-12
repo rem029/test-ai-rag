@@ -40,8 +40,7 @@ services:
               capabilities: [gpu]
     volumes:
       - ./models:/models
-    command:
-      ["--all-in-one", "/models", "7B"]
+    command: ["--all-in-one", "/models", "7B"]
     profiles:
       - cuda
 
@@ -91,9 +90,9 @@ services:
     command:
       [
         "-m",
-        "/models/gemma-3-4b-it-Q4_K_M.gguf",
+        "/models/${MODEL_VISION_MAIN_FILENAME}",
         "--mmproj",
-        "/models/gemma-3-4b-it-Q4_K_M-mmproj.gguf",
+        "/models/${MODEL_VISION_FILENAME}",
         "--port",
         "8000",
         "--host",
@@ -112,8 +111,7 @@ services:
       - "/dev/dri:/dev/dri"
     volumes:
       - ./models:/models
-    command:
-      ["--all-in-one", "/models", "7B"]
+    command: ["--all-in-one", "/models", "7B"]
     profiles:
       - vulkan
 
@@ -130,7 +128,7 @@ services:
     command:
       [
         "-m",
-        "/models/nomic-embed-text-v1.5.Q4_K_M.gguf",
+        "/models/${MODEL_EMBED_FILENAME}",
         "--port",
         "8000",
         "--host",
@@ -153,9 +151,9 @@ services:
     command:
       [
         "-m",
-        "/models/gemma-3-4b-it-Q4_K_M.gguf",
+        "/models/${MODEL_VISION_MAIN_FILENAME}",
         "--mmproj",
-        "/models/gemma-3-4b-it-Q4_K_M-mmproj.gguf",
+        "/models/${MODEL_VISION_FILENAME}",
         "--port",
         "8000",
         "--host",
