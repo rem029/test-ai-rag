@@ -84,7 +84,7 @@ async def debate(topic, rounds=10):
                 async with client.stream(
                     "POST",
                     f"http://127.0.0.1:{ai2_port}/message",
-                    json={"text": f"AI 2: {ai1_response}" , "context": context,"playAudio": False,"session_id": ai1_session_id},
+                    json={"text": f"AI 2: {ai1_response}" , "context": context,"playAudio": False,"session_id": ai2_session_id},
                     headers = {"Content-Type": "application/json"}
                 ) as response_ai2:
                     async for chunk in response_ai2.aiter_text():
