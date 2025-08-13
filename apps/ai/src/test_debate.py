@@ -1,6 +1,8 @@
 import asyncio
 import subprocess
+import uuid
 import httpx
+from yapper import PiperSpeaker, PiperVoiceGB
 
 
 async def run_ai_instance(port):
@@ -20,8 +22,10 @@ async def debate(topic, rounds=10):
     Facilitate a debate between two AI instances on a given topic.
     """
     # Start two AI instances on different ports
-    ai1_port = 8000
-    ai2_port = 8001
+    ai1_port = 8081
+    ai2_port = 8082
+    ai1_session_id = str(uuid.uuid4())
+    ai2_session_id = str(uuid.uuid4())
 
     # ai1_process = await run_ai_instance(ai1_port)
     # ai2_process = await run_ai_instance(ai2_port)
@@ -55,11 +59,17 @@ async def debate(topic, rounds=10):
                 async with client.stream(
                     "POST",
                     f"http://127.0.0.1:{ai1_port}/message",
-                    json={"text": f"AI 1: {prompt}", "context": context},
+                    json={"text": f"AI 1: {prompt}", "context": context, "playAudio": False, "session_id": ai1_session_id},
+                    headers = {"Content-Type": "application/json"}
                 ) as response_ai1:
                     async for chunk in response_ai1.aiter_text():
                         print(chunk, end="", flush=True)
                         ai1_response += chunk
+
+                # Initialize BaseSpeaker
+                speaker = PiperSpeaker(voice=PiperVoiceGB.CORI)
+                # Generate audio file
+                speaker.say(ai1_response)
 
                 # AI 2's turn
                 print("\n\nAI 2 is thinking...")
@@ -74,12 +84,18 @@ async def debate(topic, rounds=10):
                 async with client.stream(
                     "POST",
                     f"http://127.0.0.1:{ai2_port}/message",
-                    json={"text": f"AI 2: {ai1_response}" , "context": context},
+                    json={"text": f"AI 2: {ai1_response}" , "context": context,"playAudio": False,"session_id": ai1_session_id},
+                    headers = {"Content-Type": "application/json"}
                 ) as response_ai2:
                     async for chunk in response_ai2.aiter_text():
                         print(chunk, end="", flush=True)
                         ai2_response += chunk
-                
+
+                # Initialize BaseSpeaker
+                speaker = PiperSpeaker(voice=PiperVoiceGB.JENNY_DIOCO)
+                # Generate audio file
+                speaker.say(ai2_response)
+
                 # Set up for next round
                 previous_response = ai2_response
 

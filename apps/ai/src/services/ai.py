@@ -47,6 +47,7 @@ async def stream_response_logic(
     context: Optional[str] = None,
     image_base64: Optional[str] = None,
     audioResponse: bool = False,
+    playAudio: bool = True
 ):
     """
     Stream response from Ollama API using the gemma3:1b-it-q4_K_M model.
@@ -182,7 +183,8 @@ async def stream_response_logic(
                 try:
                     audio_file_path = await text_to_speech_yapper(text_response)
                     if audio_file_path and os.path.exists(audio_file_path):
-                        play_audio(audio_file_path)
+                        if playAudio:
+                            play_audio(audio_file_path)
                         yield f"\n[AUDIO_FILE:{audio_file_path}]"
                 except Exception as e:
                     logger.log_error(
@@ -218,7 +220,8 @@ async def stream_response_logic(
 
             if audio_file_path and os.path.exists(audio_file_path):
                 try:
-                    play_audio(audio_file_path)
+                    if playAudio:
+                        play_audio(audio_file_path)
                     yield f"\n[AUDIO_FILE:{audio_file_path}]"
                 except Exception as e:
                     logger.log_error(f"Audio playback failed: {str(e)}", "AUDIO_ERROR")

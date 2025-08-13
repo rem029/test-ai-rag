@@ -14,6 +14,7 @@ class MessageRequest(BaseModel):
     stream: Optional[bool] = False
     messages: Optional[list] = []  # Store conversation history
     context: Optional[str] = None  # Optional context to replace system_prompt
+    playAudio: Optional[bool] = True
 
 
 async def handle_message_logic(request: MessageRequest):
@@ -40,7 +41,8 @@ async def handle_message_logic(request: MessageRequest):
                 request.stream, 
                 request.context, 
                 request.image, 
-                request.audioResponse
+                request.audioResponse,
+                request.playAudio
             )
             return StreamingResponse(response_stream, media_type="text/plain")
         except Exception as e:
