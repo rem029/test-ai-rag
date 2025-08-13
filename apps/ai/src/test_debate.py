@@ -46,7 +46,7 @@ async def debate(topic = "Aliens", rounds=10, a1_title = "Alien Believer", a2_ti
                 
                 # AI 1's turn
                 print("\nAI 1 is thinking...")
-                print(f"A1: ({a1_title}) ")
+                print(f"AI 1: ({a1_title}) ")
                 
                 if round_num == 1:
                     # First round - AI 1 initiates
@@ -74,7 +74,7 @@ async def debate(topic = "Aliens", rounds=10, a1_title = "Alien Believer", a2_ti
                         print(chunk, end="", flush=True)
                         ai1_response += chunk
                 
-                responses += f"A1: {ai1_response}"
+                responses += f"AI 1 {a1_title}: {ai1_response}"
                 # Initialize BaseSpeaker
                 speaker = PiperSpeaker(voice=PiperVoiceGB.CORI)
                 # Generate audio file
@@ -82,7 +82,7 @@ async def debate(topic = "Aliens", rounds=10, a1_title = "Alien Believer", a2_ti
 
                 # AI 2's turn
                 print("\n\nAI 2 is thinking...")
-                print(f"A2: ({a2_title}) ")
+                print(f"AI 2: ({a2_title}) ")
                 
                 if round_num == rounds:
                     context = f"You are AI 2 {a2_title} in a debate on the topic: {topic}.\nKeep your answers short and straightforward.\nThis is the final round {round_num}. Give your final rebuttal and closing argument. Reply in plain text only."
@@ -100,7 +100,7 @@ async def debate(topic = "Aliens", rounds=10, a1_title = "Alien Believer", a2_ti
                         print(chunk, end="", flush=True)
                         ai2_response += chunk
 
-                responses += f"\nA2: {ai2_response}"
+                responses += f"AI 2 {a2_title}: {ai2_response}"
                 # Initialize BaseSpeaker
                 speaker = PiperSpeaker(voice=PiperVoiceGB.JENNY_DIOCO)
                 # Generate audio file
@@ -123,7 +123,9 @@ async def debate(topic = "Aliens", rounds=10, a1_title = "Alien Believer", a2_ti
                     f"http://127.0.0.1:{ai3_port}/message",
                     json={
                             "text": f"Summarize and tell me who won the debate here are the responses:\n{responses}",
-                            "context": f"Topic is discussed is about {topic}, you are the judge of their responses. Reply in plain text only.",
+                            "context": (f"Topic is discussed is about {topic}"
+                                        "you are the judge of their responses."
+                                        "Reply in plain text only. Do not use any symbols, markdown, or formatting—just a simple string."),
                             "playAudio": False,
                             "session_id": ai3_session_id,
                             "stream": True
