@@ -67,6 +67,33 @@ async def scrape_duckduckgo(keyword: str) -> list:
             results.append({"title": title, "link": link})
         return results
 
+async def scrape_searxng(keyword: str) -> list:
+    """Scrape DuckDuckGo search results for the given keyword."""
+    url = f"http://localhost:8888/search?q={keyword}"
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+        ),
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Referer": "https://duckduckgo.com/",
+    }
+    async with AsyncClient() as client:
+        resp = await client.get(url, headers=headers)
+        soup = BeautifulSoup(resp.text, "html.parser")
+        print(f"Scraping DuckDuckGo for keyword: {keyword}")
+        print(f"Response status: {resp.status_code}")
+        results = []
+        for result in soup.select(".result"):
+            a = result.find(".url_header")
+            p = result.find(".content")
+
+            title = a.get_text(strip=True) if a else ""
+            link = a.get("href") if a else ""
+            content = p.get_text(strip=True) if p else ""
+            results.append({"title": title, "link": link, "content": content})
+        return results
 
 async def scrape_link(url: str) -> str:
     headers = {
@@ -121,15 +148,17 @@ async def main():
                 speaker.say(f"Searching for... {current_search}")
 
                 # Use the search result to search internet with web scraping
-                results_duckduckgo = await scrape_duckduckgo(current_search)
-                results_bing = await scrape_bing(current_search)
+                results_searxng = await scrape_searxng(current_search)
+                # results_bing = await scrape_bing(current_search)
 
-                print("Top results from Duck Duck Go and Bing:\n")
-                results = results_duckduckgo + results_bing
+                print("Top results from SearxNG and Bing:\n")
+                # results = results_searxng + results_bing
+                results = results_searxng
 
                 for result in results:
                     print(f"Title: {result['title']}")
                     print(f"Link: {result['link']}")
+                    print(f"Content: {result['content']}")
 
                     results = await scrape_link(result["link"])
                     print(f"Content: {results[:200]}...")
