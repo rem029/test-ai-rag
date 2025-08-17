@@ -1,6 +1,6 @@
 import os
 from typing import Optional
-from services.embed import embed_text
+from services.embed import chunk_text, embed_text
 from services.audio import play_audio, text_to_speech_yapper
 from services.db import get_embeddings_from_db, get_recent_messages, save_message
 from services.clients import model_main
@@ -47,7 +47,7 @@ async def stream_response_logic(
     context: Optional[str] = None,
     image_base64: Optional[str] = None,
     audioResponse: bool = False,
-    playAudio: bool = True
+    playAudio: bool = True,
 ):
     """
     Stream response from Ollama API using the gemma3:1b-it-q4_K_M model.
@@ -70,8 +70,13 @@ async def stream_response_logic(
         logger.log_user_input(session_id, text, bool(image_base64), image_info)
 
         # Embedding and response generation logic
-        embedding = await embed_text(text)
-        db_embeddings = await get_embeddings_from_db(embedding)
+        chunks = chunk_text(text, 768)
+        db_embeddings = []
+        for chunk in chunks:
+            embedding = await embed_text(chunk)
+            chunk_db_embeddings = await get_embeddings_from_db(embedding)
+            db_embeddings.extend(chunk_db_embeddings)
+            await save_message(chunk, "user", session_id)
 
         # Log embedding context
         logger.log_embedding_context(len(db_embeddings))
@@ -136,7 +141,7 @@ async def stream_response_logic(
         else:
             messages.append({"role": "user", "content": text})
 
-        await save_message(text, "user", embedding, session_id)
+        await save_message(text, "user", session_id)
 
         # ---------------------------------------------------------
         #
@@ -177,7 +182,7 @@ async def stream_response_logic(
                     yield char
 
             embedding = await embed_text(text_response)
-            await save_message(text_response, "assistant", embedding, session_id)
+            await save_message(text_response, "assistant", session_id)
 
             if audioResponse:
                 try:
@@ -203,7 +208,7 @@ async def stream_response_logic(
             )
             content = response.choices[0].message.content
             embedding = await embed_text(content)
-            await save_message(content, "assistant", embedding, session_id)
+            await save_message(content, "assistant", session_id)
 
             audio_file_path = None
             if audioResponse:

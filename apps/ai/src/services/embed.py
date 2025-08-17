@@ -16,3 +16,14 @@ async def embed_text(text: str) -> dict:
     except Exception as e:
         print(f"Error generating embedding: {e}")
         return {"embedding": [-1]}
+
+
+def chunk_text(text: str, chunk_size: int = 768, overlap: int = 50):
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = start + chunk_size
+        chunk = text[start:end]
+        chunks.append(chunk)
+        start += chunk_size - overlap
+    return chunks

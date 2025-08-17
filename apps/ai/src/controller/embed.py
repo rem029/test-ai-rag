@@ -9,8 +9,8 @@ async def insert_embedding_logic(texts: list[str]):
     """
     try:
         for text in texts:
-            embedding = await embed_text(text)
-            await save_message(text, "system", embedding)
+            print("@insert_embedding_logic", "inserting...", text)
+            await save_message(text, "system")
         return {"status": "success", "message": "Embeddings inserted successfully."}
     except psycopg2.Error as e:
         print("Database error:", e)
