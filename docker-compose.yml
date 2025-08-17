@@ -25,6 +25,29 @@ services:
     volumes:
       - open-webui:/app/backend/data
 
+    # --- SearxNG meta-search + Redis (for RAG discovery) ---
+  searxng-redis:
+    image: redis:7-alpine
+    container_name: searxng-redis
+    restart: unless-stopped
+
+  searxng:
+    image: docker.io/searxng/searxng:latest
+    container_name: searxng
+    depends_on:
+      - searxng-redis
+    restart: unless-stopped
+    ports:
+      - "${SEARX_PORT:-8888}:8080"
+    environment:
+      SEARXNG_BASE_URL: "http://localhost:${SEARX_PORT:-8888}/"
+      SEARXNG_BIND_ADDRESS: "0.0.0.0"
+      SEARXNG_PORT: "8080"
+      TZ: "UTC"
+    volumes:
+      - searxng-config:/etc/searxng
+      - searxng-data:/var/cache/searxng
+
   # CUDA Services (for NVIDIA GPUs)
   llama-full-cuda:
     image: ghcr.io/ggml-org/llama.cpp:full-cuda
@@ -165,3 +188,5 @@ services:
 volumes:
   pgvector-data:
   open-webui:
+  searxng-config:
+  searxng-data:
