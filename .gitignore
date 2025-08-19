@@ -45,3 +45,5 @@ tmp
 tmp/*
 
 *.gguf
+
+seen_keywords.txt

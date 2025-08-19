@@ -106,32 +106,34 @@ async def get_embeddings_from_db(embedding: dict):
 
 async def save_message(message: str, role: str, session_id: Optional[str] = None):
     """
-    Save a message and its embedding to the database.
+    Save a (already pre-chunked upstream) message and its embedding to the database.
+    Upstream pipeline (e.g. test_search.py) is responsible for chunking.
     """
     connection = get_db_connection_instance()
     cursor = connection.cursor()
     effective_session_id = session_id if session_id is not None else "default_session"
-    logger.log_and_print(
-        f"Saving message to database for session: {effective_session_id}"
-    )
+    logger.log_and_print(f"Saving message to database for session: {effective_session_id}")
     try:
-        chunks = chunk_text(message, 768)
-        for chunk in chunks:
-            embedding = await embed_text(chunk)
-            if not chunk or embedding is None:
-                logger.log_and_print("Chunk or embedding is None, skipping save.")
-                return
-            cursor.execute(
-                """
-                INSERT INTO messages (message, role, embedding, sessionId)
-                VALUES (%s, %s, %s, %s);
-                """,
-                (chunk, role, embedding["embedding"], effective_session_id),
-            )
-            connection.commit()
+        if not message:
+            logger.log_and_print("Empty message, skipping save.")
+            return
+
+        embedding = await embed_text(message)
+        if embedding is None:
+            logger.log_and_print("Embedding is None, skipping save.")
+            return
+
+        cursor.execute(
+            """
+            INSERT INTO messages (message, role, embedding, sessionId)
+            VALUES (%s, %s, %s, %s);
+            """,
+            (message, role, embedding["embedding"], effective_session_id),
+        )
+        connection.commit()
     except psycopg2.Error as e:
         logger.log_and_print("Database error:", e)
-        connection.rollback()  # Rollback the transaction
+        connection.rollback()
     finally:
         cursor.close()
 
