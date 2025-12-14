@@ -91,6 +91,9 @@ services:
         "--host",
         "0.0.0.0",
         "--embeddings",
+        "--batch-size", "256",     # safe start for 6GB
+        "--ubatch-size", "32",     # try 16; if stable, raise to 32
+        "--parallel", "1"          # avoid concurrent spikes
       ]
     profiles:
       - cuda
@@ -157,6 +160,9 @@ services:
         "--host",
         "0.0.0.0",
         "--embeddings",
+        "--batch-size", "128",     # safe start for 6GB
+        "--ubatch-size", "16",     # try 16; if stable, raise to 32
+        "--parallel", "1"          # avoid concurrent spikes
       ]
     profiles:
       - vulkan

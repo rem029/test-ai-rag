@@ -106,7 +106,8 @@ async def get_embeddings_from_db(embedding: dict):
 
 async def save_message(message: str, role: str, session_id: Optional[str] = None):
     """
-    Save a message and its embedding to the database.
+    Save a (already pre-chunked upstream) message and its embedding to the database.
+    Upstream pipeline (e.g. test_search.py) is responsible for chunking.
     """
     connection = get_db_connection_instance()
     cursor = connection.cursor()
@@ -141,7 +142,7 @@ async def save_message(message: str, role: str, session_id: Optional[str] = None
         #     connection.commit()
     except psycopg2.Error as e:
         logger.log_and_print("Database error:", e)
-        connection.rollback()  # Rollback the transaction
+        connection.rollback()
     finally:
         cursor.close()
 

@@ -35,6 +35,7 @@ TIMEOUT = httpx.Timeout(60.0)
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/125 Safari/537.36",
+    "(KHTML, like Gecko) Chrome/125 Safari/537.36",
     "Accept-Language": "en-US,en;q=0.9",
 }
 MAX_BYTES = 2_000_000
@@ -100,14 +101,18 @@ CONTEXT = (
 PROMPT = "Suggest a keyword search for today."
 
 # ===============================
-# Utilities
+# Utilities & Chunking
 # ===============================
+SEEN_KEYWORDS_PATH = "seen_keywords.txt"  # persisted across runs
+
 SEEN_KEYWORDS_PATH = "seen_keywords.txt"  # persisted across runs
 
 _last_hit: dict[str, float] = {}
 _robots_cache: dict[str, tuple[urobot.RobotFileParser | None, float]] = {}
 _seen_simhashes: set[int] = set()
 
+STOPWORDS = set(
+    """
 STOPWORDS = set(
     """
     the of and to in a is that for on with as it by from an at this be are was or if not but have has you your we our they their can will about into over after more other using new via also than
@@ -246,13 +251,23 @@ def chunk_text(
 ) -> list[str]:
     paras = [p.strip() for p in text.split("\n\n") if p.strip()]
     chunks: list[str] = []
-    buf: list[str] = []
-    buf_tokens = 0
+    cur_tokens: list[str] = []
+    cur_len = 0
+    step = max(1, max_tokens - overlap)
+
+    def flush():
+        nonlocal cur_tokens, cur_len
+        if cur_tokens:
+            chunks.append(" ".join(cur_tokens))
+        cur_tokens = []
+        cur_len = 0
 
     for p in paras:
-        t = tokenish_len(p)
-        if t > max_tokens:
-            words = p.split()
+        words = p.split()
+        wlen = len(words)
+        if wlen > max_tokens:
+            # Flush accumulated buffer then sliding-window this large paragraph.
+            flush()
             i = 0
             step = max(1, max_tokens - overlap)
             while i < len(words):
@@ -261,21 +276,20 @@ def chunk_text(
                 i += step
             continue
 
-        if buf_tokens + t <= max_tokens:
-            buf.append(p)
-            buf_tokens += t
+        if cur_len + wlen <= max_tokens:
+            cur_tokens.extend(words)
+            cur_len += wlen
         else:
-            if buf:
-                merged = "\n\n".join(buf)
-                chunks.append(merged)
-                tail_words = merged.split()[-overlap:]
-                buf = [" ".join(tail_words), p]
-                buf_tokens = len(tail_words) + t
-            else:
-                chunks.append(p)
+            if cur_tokens:
+                # Add overlap tail into new buffer start.
+                tail = cur_tokens[-overlap:] if overlap and len(cur_tokens) > overlap else []
+                flush()
+                cur_tokens.extend(tail)
+                cur_len = len(tail)
+            cur_tokens.extend(words)
+            cur_len += wlen
 
-    if buf:
-        chunks.append("\n\n".join(buf))
+    flush()
     return chunks
 
 
@@ -300,14 +314,12 @@ def stopword_ratio(s: str) -> float:
     sw = sum(1 for w in words if w in STOPWORDS)
     return sw / max(1, len(words))
 
-
 def title_overlap(title: str, text: str) -> float:
     tw = set(re.findall(r"\b\w+\b", (title or "").lower()))
     cw = set(re.findall(r"\b\w+\b", (text or "").lower()))
     if not tw or not cw:
         return 0.0
     return len(tw & cw) / max(1, len(tw))
-
 
 def quality_score(title: str, text: str) -> float:
     n_chars = len(text)
@@ -319,22 +331,23 @@ def quality_score(title: str, text: str) -> float:
         + (min(swr, 0.65) / 0.65) * 0.25
         + min(tov, 0.6) * 0.15
         + (min(n_chars, 8000) / 8000.0) * 0.15
+        (min(n_words, 1200) / 1200.0) * 0.45
+        + (min(swr, 0.65) / 0.65) * 0.25
+        + min(tov, 0.6) * 0.15
+        + (min(n_chars, 8000) / 8000.0) * 0.15
     )
     return score
-
 
 def passes_quality(title: str, text: str) -> bool:
     if len(text) < MIN_TEXT_CHARS:
         return False
     return quality_score(title, text) >= QUALITY_THRESHOLD
 
-
 def simhash_text(s: str) -> int | None:
     if not Simhash:
         return None
     tokens = re.findall(r"\w+", s.lower())
     return Simhash(tokens).value if tokens else None
-
 
 def is_near_duplicate(s: str, hamming_threshold: int = NEAR_DUP_HAMMING) -> bool:
     h = simhash_text(s)
@@ -429,6 +442,9 @@ def extract_readable(
     title = (
         (soup.title.string or "").strip() if soup.title and soup.title.string else ""
     )
+    title = (
+        (soup.title.string or "").strip() if soup.title and soup.title.string else ""
+    )
     meta_date = None
     md = (
         soup.find("meta", {"property": "article:published_time"})
@@ -459,6 +475,9 @@ async def fetch_page(client: httpx.AsyncClient, url: str) -> str | None:
         r = await client.get(
             url, headers=HEADERS, timeout=TIMEOUT, follow_redirects=True
         )
+        r = await client.get(
+            url, headers=HEADERS, timeout=TIMEOUT, follow_redirects=True
+        )
         if r.status_code >= 400:
             print(f"[fetch] {url} -> HTTP {r.status_code}")
             return None
@@ -480,6 +499,9 @@ async def fetch_page(client: httpx.AsyncClient, url: str) -> str | None:
 # ===============================
 # SearxNG HTML fallback search
 # ===============================
+async def searxng_search(
+    client: httpx.AsyncClient, keyword: str, num: int = 10
+) -> list[dict]:
 async def searxng_search(
     client: httpx.AsyncClient, keyword: str, num: int = 10
 ) -> list[dict]:
@@ -505,6 +527,9 @@ async def searxng_search(
 # ===============================
 # AI chat
 # ===============================
+async def ai_chat(
+    client: httpx.AsyncClient, context: str, prompt: str, session_id: str
+) -> str:
 async def ai_chat(
     client: httpx.AsyncClient, context: str, prompt: str, session_id: str
 ) -> str:
@@ -678,15 +703,48 @@ async def process_url(client: httpx.AsyncClient, url: str, query: str):
         print(f"[dup] dropped {url}")
         return
 
-    chunks = chunk_text(text, max_tokens=EMBED_MAX_TOKENS, overlap=EMBED_OVERLAP)
+    header = (
+        f"{query.upper()} — {title} — {url}\n"
+        f"PUBLISHED: {published_at or 'unknown'}\n\n"
+    )
+    header_tokens = tokenish_len(header)
+    body_budget = max(1, EMBED_HARD_LIMIT - header_tokens)
+
+    chunks = chunk_text(text, max_tokens=EMBED_CHUNK_TOKENS, overlap=EMBED_OVERLAP)
+
+    async def emit_with_header(body: str):
+        # First break the body into pieces that fit under the body budget (no overlap inside header stage)
+        body_pieces = chunk_text(body, max_tokens=body_budget, overlap=0)
+        for piece in body_pieces:
+            payload = header + piece
+            # Enforce absolute cap: may still overflow due to header tokens.
+            capped = clip_to_tokens(payload, EMBED_HARD_LIMIT)
+            # Final safety split if approximation underestimated tokenization.
+            est_bpe_tokens = int(tokenish_len(capped) * BPE_EXPANSION_FACTOR)
+            if est_bpe_tokens > EMBED_HARD_LIMIT:
+                # Pre-emptive split using stricter limit derived from expansion
+                adjusted_limit = max(50, EMBED_HARD_LIMIT - int(EMBED_HARD_LIMIT * 0.15))
+                final_segments = split_if_over_limit(
+                    capped,
+                    hard_limit=adjusted_limit,
+                    overlap=EMBED_OVERLAP,
+                )
+            else:
+                final_segments = split_if_over_limit(
+                    capped, hard_limit=EMBED_HARD_LIMIT, overlap=EMBED_OVERLAP
+                )
+            for seg_idx, segment in enumerate(final_segments):
+                print(f"[emit] payload segment {seg_idx+1}/{len(final_segments)} length {tokenish_len(segment)} tokens for {url}")
+                await insert_embedding_logic([segment])
+                print(f"[sleeping] 2 seconds")
+                await asyncio.sleep(2.0)
 
     if SUMMARIZE_BEFORE_EMBED:
         for chunk in chunks:
             sid = str(uuid.uuid4())
             summary = await ai_chat(
                 client,
-                "You prepare data for RAG. Extract only the most important facts. "
-                "Return a concise factual summary in plain text, < 768 characters.",
+                "You prepare data for RAG. Extract only the most important facts. Return a concise factual summary in plain text, under 600 tokens.",
                 f"Summarize for RAG:\n{chunk}",
                 sid,
             )
@@ -733,6 +791,11 @@ async def process_url(client: httpx.AsyncClient, url: str, query: str):
 async def main():
     print("Running search…")
     try:
+        seen = load_seen_keywords()
+        pending_keyword: str | None = None
+        async with httpx.AsyncClient(
+            timeout=TIMEOUT, headers=HEADERS, follow_redirects=True
+        ) as client:
         seen = load_seen_keywords()
         pending_keyword: str | None = None
         async with httpx.AsyncClient(
@@ -831,6 +894,7 @@ async def main():
                 results = await searxng_search(client, query, num=5)
                 print(f"[searxng] {len(results)} results")
 
+                scraped_urls: list[str] = []
                 for r in results:
                     url = r.get("url", "")
                     title = r.get("title", "")
@@ -839,6 +903,17 @@ async def main():
                     print(f"==> {title} {url}")
                     await process_url(client, url, keyword)
                     await asyncio.sleep(2.0)
+
+                # Phase 3: ask AI for the next keyword based on scraped content
+                if AI_NEXT_KEYWORD_FROM_RESULTS and scraped_urls:
+                    try:
+                        next_kw = await propose_next_keyword(client, scraped_urls, seen)
+                        if next_kw and next_kw not in seen:
+                            print(f"[next] proposed next keyword: {next_kw}")
+                            pending_keyword = next_kw
+                            # note: do not add to seen yet; accept it next loop when we actually use it
+                    except Exception as e:
+                        print(f"[next] propose_next_keyword error: {e}")
 
                 await asyncio.sleep(15.0)
 
