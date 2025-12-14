@@ -120,15 +120,44 @@ async def stream_response_logic(
         # Log recent messages instead of printing
         logger.log_recent_messages(recent_messages)
 
+        # Sanitize messages to ensure User/Assistant alternation
+        sanitized_history = []
         for msg in recent_messages:
-            messages.append({"role": msg["role"], "content": msg["message"]})
+            role = msg["role"]
+            content = msg["message"]
+
+            if role not in ["user", "assistant"]:
+                continue
+
+            if not sanitized_history:
+                # History must start with user
+                if role == "user":
+                    sanitized_history.append({"role": role, "content": content})
+            else:
+                last_msg = sanitized_history[-1]
+                if last_msg["role"] == role:
+                    # Merge consecutive messages of same role
+                    last_msg["content"] += f"\n\n{content}"
+                else:
+                    sanitized_history.append({"role": role, "content": content})
+
+        # If the last message in history is 'user', merge it with the current input
+        # because the model expects User -> Assistant -> User
+        current_text_prefix = ""
+        if sanitized_history and sanitized_history[-1]["role"] == "user":
+            last_user_msg = sanitized_history.pop()
+            current_text_prefix = last_user_msg["content"] + "\n\n"
+
+        messages.extend(sanitized_history)
+
+        final_text = current_text_prefix + text
 
         if image_base64:
             messages.append(
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": text},
+                        {"type": "text", "text": final_text},
                         {
                             "type": "image_url",
                             "image_url": {
@@ -139,7 +168,7 @@ async def stream_response_logic(
                 }
             )
         else:
-            messages.append({"role": "user", "content": text})
+            messages.append({"role": "user", "content": final_text})
 
         await save_message(text, "user", session_id)
 

@@ -115,20 +115,30 @@ async def save_message(message: str, role: str, session_id: Optional[str] = None
         f"Saving message to database for session: {effective_session_id}"
     )
     try:
-        chunks = chunk_text(message, 768)
-        for chunk in chunks:
-            embedding = await embed_text(chunk)
-            if not chunk or embedding is None:
-                logger.log_and_print("Chunk or embedding is None, skipping save.")
-                return
-            cursor.execute(
-                """
-                INSERT INTO messages (message, role, embedding, sessionId)
-                VALUES (%s, %s, %s, %s);
-                """,
-                (chunk, role, embedding["embedding"], effective_session_id),
-            )
-            connection.commit()
+        print(f"Embedding message... Length: {len(message)}")
+        embedding = await embed_text(message)
+        cursor.execute(
+            """
+            INSERT INTO messages (message, role, embedding, sessionId)
+            VALUES (%s, %s, %s, %s);
+            """,
+            (message, role, embedding["embedding"], effective_session_id),
+        )
+        connection.commit()
+        # chunks = chunk_text(message, 768)
+        # for chunk in chunks:
+        #     embedding = await embed_text(chunk)
+        #     if not chunk or embedding is None:
+        #         logger.log_and_print("Chunk or embedding is None, skipping save.")
+        #         return
+        #     cursor.execute(
+        #         """
+        #         INSERT INTO messages (message, role, embedding, sessionId)
+        #         VALUES (%s, %s, %s, %s);
+        #         """,
+        #         (chunk, role, embedding["embedding"], effective_session_id),
+        #     )
+        #     connection.commit()
     except psycopg2.Error as e:
         logger.log_and_print("Database error:", e)
         connection.rollback()  # Rollback the transaction

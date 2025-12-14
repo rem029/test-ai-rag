@@ -24,6 +24,7 @@ detect_container_engine() {
         print_error "Neither Docker nor Podman is installed. Please install one to continue."
         exit 1
     fi
+    print_info "Using container engine: $CONTAINER_CMD"
 }
 
 # Default values
