@@ -1,4 +1,6 @@
 import os
+import base64
+import time
 from typing import Optional
 from services.embed import chunk_text, embed_text
 from services.audio import play_audio, text_to_speech_yapper
@@ -46,7 +48,7 @@ async def stream_response_logic(
     stream: bool = True,
     context: Optional[str] = None,
     image_base64: Optional[str] = None,
-    audioResponse: bool = False,
+    audioResponse: bool = True,
     playAudio: bool = True,
 ):
     """
@@ -68,6 +70,26 @@ async def stream_response_logic(
         # Log user input
         image_info = "Image attached" if image_base64 else "No image"
         logger.log_user_input(session_id, text, bool(image_base64), image_info)
+
+        if image_base64 and "esp32-bot-" in session_id:
+            # Ensure uploads directory exists
+            uploads_dir = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)), "uploads"
+            )
+            os.makedirs(uploads_dir, exist_ok=True)
+
+            timestamp = int(time.time())
+            filename = f"{session_id}_{timestamp}.png"
+            file_path = os.path.join(uploads_dir, filename)
+
+            try:
+                with open(file_path, "wb") as fh:
+                    fh.write(base64.b64decode(image_base64))
+                logger.log_and_print(
+                    f"🖼️ [green]Image saved:[/green] [blue]{file_path}[/blue]"
+                )
+            except Exception as e:
+                logger.log_error(f"Failed to save image: {str(e)}", "IMAGE_SAVE_ERROR")
 
         # Embedding and response generation logic
         chunks = chunk_text(text, 768)
