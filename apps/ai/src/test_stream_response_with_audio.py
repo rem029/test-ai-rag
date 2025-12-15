@@ -276,6 +276,7 @@ def build_context() -> str:
 
         RULES:
         - Look for the cat; if seen or likely in a direction, prefer that way if safe.
+        - If the cat is NOT visible, prioritize turning 'left' or 'right' to scan the room. Avoid going 'forward' blindly unless following a clear path.
         - If cat is <0.5 m away or in danger, STOP.
         - Safety-first: stop if obstacle/drop/void within 0.8 m, poor visibility, moving hazard, or low confidence.
         - Avoid rapid L/R flips; if unsure, stop.
@@ -409,25 +410,49 @@ def chat_with_server():
                     # Stream the server's response character by character
                     for char in response.iter_text():
                         full_response += char
+                        print(char, end="", flush=True)
 
-                        # Check if we received an audio file marker
+                    print()  # Newline
+
+                    # Process response
+                    import json
+
+                    try:
+                        # Attempt to parse JSON
+                        # Handle potential markdown wrapping
+                        json_str = full_response.strip()
+                        if json_str.startswith("```json"):
+                            json_str = json_str[7:].strip()
+                        if json_str.endswith("```"):
+                            json_str = json_str[:-3].strip()
+
+                        data = json.loads(json_str)
+                        description = data.get("description")
+
+                        if description:
+                            print(f"\n🗣️ Speaking description...")
+                            speaker.say(description)
+                        else:
+                            print(
+                                "\n⚠️ No description in JSON, speaking default message."
+                            )
+                            speaker.say(
+                                "I received a response but it has no description."
+                            )
+
+                    except json.JSONDecodeError:
+                        # Not JSON, check for audio file marker
                         if "[AUDIO_FILE:" in full_response and "]" in full_response:
-                            # Extract the audio file path
                             match = re.search(r"\[AUDIO_FILE:(.*?)\]", full_response)
                             if match:
                                 audio_file_path = match.group(1)
-                                print()
-                                break
+                                if os.path.exists(audio_file_path):
+                                    print("\n🗣️ Speaking via audio file path...")
+                                    # play_audio(audio_file_path)
                         else:
-                            print(char, end="", flush=True)
-
-                    # Play audio if available
-                    # if audio_file_path and os.path.exists(audio_file_path):
-                    #     if play_choice != "n":
-                    #         play_audio(audio_file_path)
-
-                    # elif audio_response and not audio_file_path:
-                    #     print("\n⚠️ Audio was requested but no audio file was generated.")
+                            # Not JSON and no audio file, speak the text
+                            print("\n🗣️ Speaking full response...")
+                            # speaker.say(full_response)
 
                 else:
                     print(f"❌ Server error: {response.status_code}")
