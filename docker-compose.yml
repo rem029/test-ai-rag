@@ -191,6 +191,58 @@ services:
     profiles:
       - vulkan
 
+  llama-coder-cuda:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    container_name: llama-coder
+    restart: unless-stopped
+    ports:
+      - "${MODEL_CODER_PORT:-8001}:8000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: ${GPU_DEVICE_COUNT:-1}
+              capabilities: [gpu]
+    volumes:
+      - ./models:/models
+    command:
+      [
+        "-m", "/models/${MODEL_CODER_FILENAME}",
+        "--port", "8000",
+        "--host", "0.0.0.0",
+        "-ngl", "99",          # <--- CRITICAL: Offloads layers to GPU
+        "-fa",                 # Flash Attention (saves VRAM, boosts speed)
+        "-c", "8192",          # Limits context to keep VRAM usage stable
+        "--ubatch-size", "256" # Smaller batch for smoother laptop performance
+      ]
+    profiles:
+      - cuda
+      - coder
+
+  # llama-coder-vulkan:
+  #   image: ghcr.io/ggml-org/llama.cpp:server-vulkan
+  #   container_name: llama-coder
+  #   restart: unless-stopped
+  #   ports:
+  #     - "${MODEL_CODER_PORT:-8001}:8000"
+  #   devices:
+  #     - "/dev/dri:/dev/dri"
+  #   volumes:
+  #     - ./models:/models
+  #   command:
+  #     [
+  #       "-m",
+  #       "/models/${MODEL_CODER_FILENAME}",
+  #       "--port",
+  #       "8000",
+  #       "--host",
+  #       "0.0.0.0",
+  #     ]
+  #   profiles:
+  #     - vulkan
+  #     - coder
+
 volumes:
   pgvector-data:
   open-webui:
