@@ -240,6 +240,7 @@ show_usage() {
     echo "Examples:"
     echo "  $0 setup                    # Run interactive setup"
     echo "  $0 auto                     # Auto-detect and setup"
+}
 
 # Main script logic
 case "$1" in
