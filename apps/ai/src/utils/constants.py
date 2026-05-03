@@ -13,6 +13,6 @@ DB_CONFIG = {
 }
 
 MODEL_PORT = {
-    "main": os.getenv("PORT_MODEL_MM", "http://localhost:9001"),
-    "embed": os.getenv("PORT_MODEL_EMBED", "http://localhost:9002"),
+    "main": os.getenv("PORT_MODEL_MM", "http://localhost:9001/v1") if os.getenv("INFERENCE_MODE") != "lmstudio" else os.getenv("LM_STUDIO_URL", "http://localhost:1234/v1"),
+    "embed": os.getenv("PORT_MODEL_EMBED", "http://localhost:9002/v1") if os.getenv("INFERENCE_MODE") != "lmstudio" else os.getenv("LM_STUDIO_URL", "http://localhost:1234/v1"),
 }

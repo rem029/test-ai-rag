@@ -1,0 +1,9 @@
+httpx
+python-dotenv
+yapper
+pillow
+beautifulsoup4
+trafilatura
+simhash
+asyncio
+uuid

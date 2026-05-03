@@ -1,22 +1,25 @@
 # 🤖 AI RAG Application
 
-A comprehensive AI-powered Retrieval-Augmented Generation (RAG) application with multi-GPU support, featuring LLaMA models, embeddings, vision capabilities, and a modern chat interface.
+A comprehensive AI-powered Retrieval-Augmented Generation (RAG) application with multi-GPU support, featuring LLaMA models, embeddings, vision capabilities, and flexible inference options (llama.cpp or LM Studio).
 
 ## 🚀 Quick Start
 
 ### 1. Clone and Setup
+
 ```bash
 git clone <repository-url>
 cd test-ai-rag
 ```
 
-### 2. Auto-Configure GPU Backend
+### 2. Configure Environment
+
 ```bash
-# Auto-detect your GPU and configure the project
-./gpu-setup.sh auto
+# Run the interactive setup to choose GPU backend and inference mode
+./setup.sh setup
 ```
 
-### 3. Install Models
+### 3. Install Models (If using llama.cpp)
+
 ```bash
 cd models
 sh install-models.sh
@@ -24,9 +27,10 @@ cd ..
 ```
 
 ### 4. Start Services
+
 ```bash
-# Start all services with auto-detected GPU backend
-./gpu-setup.sh start
+# Start all services with your saved configuration
+./setup.sh start
 
 # Or manually with Docker Compose
 docker compose --profile cuda up -d    # For NVIDIA GPUs
@@ -34,6 +38,7 @@ docker compose --profile vulkan up -d  # For AMD/Intel GPUs
 ```
 
 ### 5. Access Services
+
 - **Open WebUI**: http://localhost:3000 (Chat Interface)
 - **AI API**: http://localhost:8000 (FastAPI Backend)
 - **PostgreSQL**: localhost:5433 (Database)
@@ -46,18 +51,22 @@ docker compose --profile vulkan up -d  # For AMD/Intel GPUs
 ```
 test-ai-rag/
 ├── apps/
-│   └── ai/                    # Python FastAPI backend
-│       ├── src/
-│       │   ├── main.py        # FastAPI application
-│       │   ├── controller/    # API controllers
-│       │   ├── routes/        # API routes
-│       │   ├── services/      # Business logic
-│       │   └── utils/         # Utilities
-│       └── requirements.txt
+│   ├── ai/                    # Python FastAPI backend
+│   │   ├── src/
+│   │   │   ├── main.py        # FastAPI application
+│   │   │   ├── controller/    # API controllers
+│   │   │   ├── routes/        # API routes
+│   │   │   ├── services/      # Business logic
+│   │   │   └── utils/         # Utilities
+│   │   └── requirements.txt
+│   └── test/                  # Test scripts and clients
+│       ├── requirements.txt
+│       ├── setup-test-env.sh  # Script to create venv and install deps
+│       └── test_*.py
 ├── models/                    # AI models storage
 │   └── install-models.sh      # Model installation script
 ├── docker-compose.yml         # Multi-GPU Docker setup
-├── gpu-setup.sh              # GPU configuration script
+├── setup.sh                  # Interactive setup and management script
 ├── .env                      # Environment configuration
 └── .env.example              # Environment template
 ```
@@ -67,11 +76,13 @@ test-ai-rag/
 ## 🔧 System Requirements
 
 ### Prerequisites
+
 - **Docker & Docker Compose** (latest version)
 - **Python 3.10+** (for local development)
 - **pyenv** (recommended for Python management)
 
 ### GPU Support
+
 - **NVIDIA GPUs**: RTX/GTX series, Tesla, Quadro (requires NVIDIA Container Toolkit)
 - **AMD/Intel GPUs**: Radeon, Intel Arc, integrated graphics (requires Vulkan support)
 
@@ -99,24 +110,26 @@ MODEL_EMBED_PORT=9002    # Embedding service
 # API Configuration
 API_BASE_URL=http://localhost:8000  # Base URL for AI service API
 
-# GPU Configuration (auto-configured by gpu-setup.sh)
+# GPU & Inference Configuration (configured by setup.sh)
 GPU_BACKEND=cuda         # Options: 'cuda' or 'vulkan'
+INFERENCE_MODE=llamacpp  # Options: 'llamacpp' or 'lmstudio'
+LM_STUDIO_URL=http://localhost:1234/v1
 GPU_DEVICE_COUNT=1       # Number of GPUs to use
 ```
 
-### GPU Backend Selection
+### Setup and Mode Selection
 
-The application automatically detects and configures the appropriate GPU backend:
+The application supports two inference modes via the `setup.sh` script:
 
-#### 🟢 NVIDIA GPUs (CUDA)
-- **Auto-detected for**: RTX 3060, RTX 4090, GTX 1080, Tesla, etc.
-- **Requirements**: NVIDIA Container Toolkit
-- **Services**: `llama-*-cuda`
+#### 1. llama.cpp (Docker)
 
-#### 🔵 AMD/Intel GPUs (Vulkan)
-- **Auto-detected for**: Radeon RX series, Intel Arc, integrated graphics
-- **Requirements**: Vulkan drivers, `/dev/dri` devices
-- **Services**: `llama-*-vulkan`
+- **Managed**: Runs entirely within Docker containers.
+- **Hardware**: Uses `cuda` or `vulkan` based on detection.
+
+#### 2. LM Studio API
+
+- **External**: Connects to an external LM Studio instance running on your host.
+- **Minimal**: Only starts database and search containers locally.
 
 ---
 
@@ -124,13 +137,13 @@ The application automatically detects and configures the appropriate GPU backend
 
 ### Available Services
 
-| Service | Purpose | Port | Profile |
-|---------|---------|------|---------|
-| `pgvector` | PostgreSQL with vector extension | 5433 | all |
-| `open-webui` | Web chat interface | 3000 | all |
-| `llama-full-cuda/vulkan` | Complete LLaMA chat model | - | cuda/vulkan |
-| `llama-embed-cuda/vulkan` | Text embedding service | 9002 | cuda/vulkan |
-| `llama-vision-cuda/vulkan` | Vision/multimodal service | 9001 | cuda/vulkan |
+| Service                    | Purpose                          | Port | Profile     |
+| -------------------------- | -------------------------------- | ---- | ----------- |
+| `pgvector`                 | PostgreSQL with vector extension | 5433 | all         |
+| `open-webui`               | Web chat interface               | 3000 | all         |
+| `llama-full-cuda/vulkan`   | Complete LLaMA chat model        | -    | cuda/vulkan |
+| `llama-embed-cuda/vulkan`  | Text embedding service           | 9002 | cuda/vulkan |
+| `llama-vision-cuda/vulkan` | Vision/multimodal service        | 9001 | cuda/vulkan |
 
 ### Manual Docker Commands
 
@@ -150,26 +163,25 @@ docker compose down --remove-orphans
 
 ---
 
-## 🎯 GPU Setup Script
+## 🎯 Setup Script
 
-The `gpu-setup.sh` script provides easy GPU configuration management:
+The `setup.sh` script provides easy GPU and inference mode management:
 
 ```bash
-# Auto-detect GPU and configure
-./gpu-setup.sh auto
+# Interactive setup (Choose between llama.cpp or LM Studio)
+./setup.sh setup
 
-# Manual configuration
-./gpu-setup.sh setup cuda      # Force NVIDIA/CUDA
-./gpu-setup.sh setup vulkan    # Force AMD/Intel/Vulkan
+# Auto-detect GPU and configure with llama.cpp defaults
+./setup.sh auto
 
 # Service management
-./gpu-setup.sh start           # Start all services
-./gpu-setup.sh start llama-embed  # Start specific service
-./gpu-setup.sh stop            # Stop all services
-./gpu-setup.sh status          # Show current config
+./setup.sh start           # Start your configured stack
+./setup.sh start searxng   # Start specific service
+./setup.sh stop            # Stop all services
+./setup.sh status          # Show current choice of backend/mode
 
 # Detection only
-./gpu-setup.sh detect          # Show recommended backend
+./setup.sh detect          # Show recommended GPU backend
 ```
 
 ---
@@ -177,12 +189,14 @@ The `gpu-setup.sh` script provides easy GPU configuration management:
 ## 📦 Models
 
 ### Automatic Installation
+
 ```bash
 cd models
 sh install-models.sh  # Downloads required models
 ```
 
 ### Manual Installation
+
 ```bash
 # Embedding model
 wget -P ./models https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF/resolve/main/nomic-embed-text-v1.5.Q4_K_M.gguf
@@ -237,6 +251,7 @@ uvicorn src.main:app --port 8000 --reload
 ### GPU Issues
 
 #### NVIDIA GPU Not Detected
+
 ```bash
 # Check GPU
 nvidia-smi
@@ -253,6 +268,7 @@ docker run --rm --gpus all nvidia/cuda:12.1-runtime-ubuntu22.04 nvidia-smi
 ```
 
 #### AMD/Intel GPU Issues
+
 ```bash
 # Check DRI devices
 ls -la /dev/dri
@@ -282,6 +298,7 @@ docker compose down --remove-orphans
 ### WSL2 Specific
 
 For Windows WSL2 users with NVIDIA GPUs:
+
 - Ensure NVIDIA Container Toolkit is installed in WSL2
 - Use CUDA backend (`GPU_BACKEND=cuda`)
 - `/dev/dri` devices are not available in WSL2
@@ -293,13 +310,15 @@ For Windows WSL2 users with NVIDIA GPUs:
 ### Multi-System Deployment
 
 **On NVIDIA system**:
+
 ```bash
 ./gpu-setup.sh setup cuda
 ./gpu-setup.sh start
 ```
 
 **On AMD system**:
-```bash  
+
+```bash
 ./gpu-setup.sh setup vulkan
 ./gpu-setup.sh start
 ```
@@ -315,7 +334,7 @@ command:
     "/models/your-custom-model.gguf",
     "--port",
     "8000",
-    "--host", 
+    "--host",
     "0.0.0.0",
   ]
 ```
@@ -333,6 +352,7 @@ GPU_DEVICE_COUNT=2  # Use 2 GPUs
 ## 📚 API Documentation
 
 Once running, visit:
+
 - **Interactive API Docs**: http://localhost:8000/docs
 - **ReDoc**: http://localhost:8000/redoc
 
@@ -343,7 +363,7 @@ Once running, visit:
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Test with `./gpu-setup.sh auto` 
+4. Test with `./gpu-setup.sh auto`
 5. Submit a pull request
 
 ---
